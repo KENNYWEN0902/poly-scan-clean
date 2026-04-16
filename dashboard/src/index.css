@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #630ed4;
+  --color-primary-container: #7c3aed;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #ede0ff;
+  --color-primary-fixed: #eaddff;
+  --color-primary-fixed-dim: #d2bbff;
+  --color-inverse-primary: #d2bbff;
+
+  --color-secondary: #006c49;
+  --color-secondary-container: #6cf8bb;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #00714d;
+  --color-secondary-fixed: #6ffbbe;
+  --color-secondary-fixed-dim: #4edea3;
+
+  --color-tertiary: #7d3d00;
+  --color-tertiary-container: #a15100;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffe0cd;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --color-background: #f6fafe;
+  --color-on-background: #171c1f;
+  --color-surface: #f6fafe;
+  --color-surface-bright: #f6fafe;
+  --color-surface-dim: #d6dade;
+  --color-surface-tint: #732ee4;
+  --color-on-surface: #171c1f;
+  --color-on-surface-variant: #4a4455;
+
+  --color-surface-container: #eaeef2;
+  --color-surface-container-low: #f0f4f8;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #e4e9ed;
+  --color-surface-container-highest: #dfe3e7;
+
+  --color-surface-variant: #dfe3e7;
+  --color-outline: #7b7487;
+  --color-outline-variant: #ccc3d8;
+  --color-inverse-surface: #2c3134;
+  --color-inverse-on-surface: #edf1f5;
+
+  --font-family-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Base */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f6fafe;
+  color: #171c1f;
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Neumorphic shadow */
+.neo-shadow {
+  box-shadow: 20px 20px 60px #d9dee3, -20px -20px 60px #ffffff;
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+/* Active glow for sidebar */
+.active-glow {
+  filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.4));
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc3d8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7b7487;
+}

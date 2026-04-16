@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PolyBot | Precision Trading Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#732ee4",
+                        "on-secondary-fixed-variant": "#005236",
+                        "secondary": "#006c49",
+                        "error": "#ba1a1a",
+                        "surface-container": "#eaeef2",
+                        "on-surface-variant": "#4a4455",
+                        "inverse-surface": "#2c3134",
+                        "secondary-fixed-dim": "#4edea3",
+                        "on-primary-fixed": "#25005a",
+                        "surface-variant": "#dfe3e7",
+                        "surface-container-low": "#f0f4f8",
+                        "primary-container": "#7c3aed",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#d6dade",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#301400",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-tertiary-fixed-variant": "#713700",
+                        "error-container": "#ffdad6",
+                        "outline": "#7b7487",
+                        "primary-fixed-dim": "#d2bbff",
+                        "tertiary-container": "#a15100",
+                        "inverse-primary": "#d2bbff",
+                        "tertiary": "#7d3d00",
+                        "surface-container-high": "#e4e9ed",
+                        "primary": "#630ed4",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#00714d",
+                        "background": "#f6fafe",
+                        "surface-container-highest": "#dfe3e7",
+                        "inverse-on-surface": "#edf1f5",
+                        "outline-variant": "#ccc3d8",
+                        "on-primary-fixed-variant": "#5a00c6",
+                        "primary-fixed": "#eaddff",
+                        "tertiary-fixed": "#ffdcc6",
+                        "surface": "#f6fafe",
+                        "on-surface": "#171c1f",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#ede0ff",
+                        "on-secondary-fixed": "#002113",
+                        "on-background": "#171c1f",
+                        "tertiary-fixed-dim": "#ffb784",
+                        "surface-bright": "#f6fafe",
+                        "secondary-container": "#6cf8bb",
+                        "on-tertiary-container": "#ffe0cd",
+                        "on-error": "#ffffff"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f6fafe; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); }
+        .neo-shadow { box-shadow: 20px 20px 60px #d9dee3, -20px -20px 60px #ffffff; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .active-glow { filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.4)); }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex min-h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="h-screen w-64 fixed left-0 top-0 flex flex-col bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50">
+<div class="flex flex-col h-full p-4">
+<!-- Brand Section -->
+<div class="flex items-center gap-3 px-2 mb-10">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<div>
+<h1 class="text-xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">PolyBot</h1>
+<p class="text-[10px] uppercase tracking-widest text-primary font-bold">Automated Trading</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-violet-700 dark:text-violet-300 font-semibold bg-violet-50 dark:bg-violet-900/30 rounded-xl active:scale-[0.98] transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<div class="flex flex-col">
+<span class="text-sm">Dashboard</span>
+<span class="text-[10px] opacity-70 font-normal">Daily summary</span>
+</div>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/50 transition-all rounded-xl active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">insights</span>
+<span class="text-sm">Strategies</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/50 transition-all rounded-xl active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-sm">Positions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/50 transition-all rounded-xl active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="text-sm">History</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/50 transition-all rounded-xl active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm">Settings</span>
+</a>
+</nav>
+<!-- Sidebar Footer -->
+<div class="mt-auto pt-6 space-y-4">
+<div class="p-4 bg-surface-container rounded-2xl">
+<div class="flex justify-between items-end mb-2">
+<span class="text-[10px] text-slate-500 font-bold uppercase">Global Equity</span>
+<span class="text-xs font-bold text-secondary">+$120.40</span>
+</div>
+<div class="h-8 w-full bg-slate-200/50 rounded flex items-end overflow-hidden">
+<div class="w-full h-full bg-gradient-to-t from-secondary/10 to-transparent flex items-end">
+<svg class="w-full h-6" preserveaspectratio="none" viewbox="0 0 100 20">
+<path d="M0,20 Q10,5 20,15 T40,5 T60,18 T80,8 T100,12" fill="none" stroke="#10B981" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="mt-2 text-lg font-black text-slate-900">$12,450.62</div>
+</div>
+<div class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-2xl shadow-sm">
+<img alt="User Profile" class="w-10 h-10 rounded-xl object-cover" data-alt="Close up portrait of a young professional male in a clean studio setting with soft natural light and blue background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBv3FqL2R20jdt08p1RhxU8qccTLI2JqDctHyu7Yd_Gl5wKezMXkC_ZJJtH541N5o0ccxopIGR_1t-YuD6qytI7JdGWkBXYxn1FTbrf6A4aNUer2X2f27utdPhy1VeBxYbF1lYhhK4JOJ81TiIzngqwDaNk9VMtOaxHOGFP0Lz7qNx5JL0H8hust4-9ovf_I4DN38VDFqftpEZJCiZ3_lF3NtoAYIBJTRNpnjtgng2nrA_2vK3gscMSvoKzw9wxfgIRhN1YVoOyxC4"/>
+<div class="flex-1 min-w-0">
+<div class="text-xs font-bold truncate">Alex Rivera</div>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-secondary rounded-full animate-pulse"></span>
+<span class="text-[10px] text-slate-500 uppercase font-medium">Online - Synced</span>
+</div>
+</div>
+<button class="text-slate-400 hover:text-error transition-colors">
+<span class="material-symbols-outlined text-lg">logout</span>
+</button>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<main class="ml-64 flex-1 flex flex-col min-h-screen relative overflow-y-auto">
+<!-- Top Navbar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl z-40 border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex justify-between items-center px-8 h-full">
+<div class="flex items-center gap-2 text-xs font-medium text-slate-400">
+<span>Pages</span>
+<span class="text-slate-300">/</span>
+<span>Dashboard</span>
+<span class="text-slate-300">/</span>
+<span class="text-slate-900 dark:text-white font-semibold">Daily Summary</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="bg-surface-container-low border-none rounded-xl pl-10 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Search markets..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-4 h-4 bg-primary text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">3</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="mt-16 p-8 pb-12 space-y-8">
+<!-- KPI Cards Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+<!-- P&L -->
+<div class="bg-surface-container-lowest p-5 rounded-[2rem] neo-shadow border border-white/50">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary/10 rounded-xl text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">monetization_on</span>
+</div>
+</div>
+<p class="text-label-md text-slate-500 font-semibold text-xs uppercase tracking-wider">Total P&amp;L</p>
+<h3 class="text-2xl font-black text-on-surface mt-1">+$1,020.50</h3>
+<p class="text-xs text-secondary font-bold mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                        +12.4% last 7d
+                    </p>
+</div>
+<!-- Win Rate -->
+<div class="bg-surface-container-lowest p-5 rounded-[2rem] neo-shadow border border-white/50">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-secondary/10 rounded-xl text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<p class="text-label-md text-slate-500 font-semibold text-xs uppercase tracking-wider">Win Rate</p>
+<h3 class="text-2xl font-black text-on-surface mt-1">68.5%</h3>
+<p class="text-xs text-secondary font-bold mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">add</span>
+                        +2.1% from yesterday
+                    </p>
+</div>
+<!-- Drawdown -->
+<div class="bg-surface-container-lowest p-5 rounded-[2rem] neo-shadow border border-white/50">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-orange-100 rounded-xl text-orange-600">
+<span class="material-symbols-outlined">south_east</span>
+</div>
+</div>
+<p class="text-label-md text-slate-500 font-semibold text-xs uppercase tracking-wider">Max Drawdown</p>
+<h3 class="text-2xl font-black text-on-surface mt-1">-4.2%</h3>
+<p class="text-xs text-error font-bold mt-2">Increased last 24h</p>
+</div>
+<!-- Exposure -->
+<div class="bg-surface-container-lowest p-5 rounded-[2rem] neo-shadow border border-white/50">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-blue-100 rounded-xl text-blue-600">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pie_chart</span>
+</div>
+</div>
+<p class="text-label-md text-slate-500 font-semibold text-xs uppercase tracking-wider">Current Exposure %</p>
+<h3 class="text-2xl font-black text-on-surface mt-1">35%</h3>
+<p class="text-xs text-slate-500 font-medium mt-2">Utilized capital</p>
+</div>
+<!-- Active Strategies -->
+<div class="bg-surface-container-lowest p-5 rounded-[2rem] neo-shadow border border-white/50">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-violet-100 rounded-xl text-violet-600">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings_input_component</span>
+</div>
+</div>
+<p class="text-label-md text-slate-500 font-semibold text-xs uppercase tracking-wider">Active Strategies</p>
+<h3 class="text-2xl font-black text-on-surface mt-1">4</h3>
+<p class="text-xs text-slate-500 font-medium mt-2">3 Profitable, 1 Inactive</p>
+</div>
+</section>
+<!-- Main Dashboard Layout -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Main Content (Left Col 8) -->
+<div class="col-span-12 lg:col-span-8 space-y-8">
+<!-- Equity Curve Card -->
+<div class="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow relative overflow-hidden">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h2 class="text-xl font-black text-slate-900">Equity Curve (30D)</h2>
+<p class="text-sm text-slate-400 font-medium">Portfolio performance tracking</p>
+</div>
+<div class="flex gap-2 p-1 bg-surface-container-low rounded-xl">
+<button class="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900">1D</button>
+<button class="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900">7D</button>
+<button class="px-3 py-1.5 text-xs font-bold bg-white text-primary rounded-lg shadow-sm">30D</button>
+<button class="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900">YTD</button>
+<button class="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-900">MAX</button>
+</div>
+</div>
+<!-- Chart Simulation Area -->
+<div class="relative h-64 w-full mt-4">
+<!-- Background Grid -->
+<div class="absolute inset-0 flex flex-col justify-between opacity-5">
+<div class="border-t border-slate-900 w-full"></div>
+<div class="border-t border-slate-900 w-full"></div>
+<div class="border-t border-slate-900 w-full"></div>
+<div class="border-t border-slate-900 w-full"></div>
+</div>
+<!-- Area Chart SVG -->
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 200">
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#7C3AED" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#7C3AED" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,180 Q100,160 200,140 T400,100 T600,60 T800,40 T1000,20 L1000,200 L0,200 Z" fill="url(#chartGradient)"></path>
+<path d="M0,180 Q100,160 200,140 T400,100 T600,60 T800,40 T1000,20" fill="none" stroke="#7C3AED" stroke-linecap="round" stroke-width="4"></path>
+<!-- Markers -->
+<circle cx="200" cy="140" fill="#10B981" r="4"></circle> <!-- Win -->
+<circle cx="450" cy="90" fill="#EF4444" r="4"></circle> <!-- Loss -->
+<circle cx="700" cy="50" fill="#7C3AED" r="4"></circle> <!-- Strat Change -->
+</svg>
+<!-- Labels / Markers Overlays -->
+<div class="absolute top-[125px] left-[18%] bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded">+$</div>
+<div class="absolute top-[75px] left-[43%] bg-error text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-$</div>
+<div class="absolute top-[35px] left-[68%] bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded">S</div>
+<!-- Tooltip -->
+<div class="absolute top-4 right-[10%] glass-card p-4 rounded-2xl neo-shadow border border-white pointer-events-none">
+<div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Portfolio Stats</div>
+<div class="text-sm font-black text-slate-900">Current: $11,120.50</div>
+<div class="text-xs text-secondary font-bold">YTD Return: +12.0%</div>
+</div>
+</div>
+</div>
+<!-- Positions/Trades Tabs Section -->
+<div class="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
+<div class="flex items-center gap-8 mb-6 border-b border-slate-100">
+<button class="pb-4 text-sm font-black text-primary border-b-2 border-primary">Open Positions</button>
+<button class="pb-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">Trade History</button>
+<button class="pb-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">Execution Log</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+<th class="pb-4 px-2">Market</th>
+<th class="pb-4 px-2">Side</th>
+<th class="pb-4 px-2">Quantity</th>
+<th class="pb-4 px-2">Avg. Price</th>
+<th class="pb-4 px-2">Current</th>
+<th class="pb-4 px-2 text-right">P&amp;L (%)</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<tr class="border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
+<td class="py-4 px-2 font-bold text-slate-900">US Election 2024</td>
+<td class="py-4 px-2"><span class="px-2 py-1 bg-secondary/10 text-secondary text-[10px] font-bold rounded-lg">YES</span></td>
+<td class="py-4 px-2 font-medium">1,250.00</td>
+<td class="py-4 px-2 text-slate-500">$0.52</td>
+<td class="py-4 px-2 text-slate-500">$0.58</td>
+<td class="py-4 px-2 text-right font-black text-secondary">+11.5%</td>
+</tr>
+<tr class="border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
+<td class="py-4 px-2 font-bold text-slate-900">BTC EOY &gt; $100k</td>
+<td class="py-4 px-2"><span class="px-2 py-1 bg-secondary/10 text-secondary text-[10px] font-bold rounded-lg">YES</span></td>
+<td class="py-4 px-2 font-medium">500.00</td>
+<td class="py-4 px-2 text-slate-500">$0.35</td>
+<td class="py-4 px-2 text-slate-500">$0.38</td>
+<td class="py-4 px-2 text-right font-black text-secondary">+8.5%</td>
+</tr>
+<tr class="border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
+<td class="py-4 px-2 font-bold text-slate-900">Interest Rate Cut Sep</td>
+<td class="py-4 px-2"><span class="px-2 py-1 bg-error/10 text-error text-[10px] font-bold rounded-lg">NO</span></td>
+<td class="py-4 px-2 font-medium">2,000.00</td>
+<td class="py-4 px-2 text-slate-500">$0.78</td>
+<td class="py-4 px-2 text-slate-500">$0.75</td>
+<td class="py-4 px-2 text-right font-black text-error">-3.8%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Side Panels (Right Col 4) -->
+<div class="col-span-12 lg:col-span-4 space-y-8">
+<!-- Weekly Performance Card -->
+<div class="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
+<h2 class="text-xl font-black text-slate-900 mb-6">Weekly Performance</h2>
+<div class="flex items-end justify-between h-48 gap-3">
+<div class="flex flex-col items-center gap-2 flex-1 group">
+<div class="w-full bg-slate-100 rounded-t-lg relative h-24 overflow-hidden">
+<div class="absolute bottom-0 w-full bg-secondary/80 h-full"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-400">MON</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-slate-100 rounded-t-lg relative h-16 overflow-hidden">
+<div class="absolute bottom-0 w-full bg-error/80 h-1/2"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-400">TUE</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-slate-100 rounded-t-lg relative h-32 overflow-hidden">
+<div class="absolute bottom-0 w-full bg-secondary/80 h-3/4"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-400">WED</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1 relative">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 glass-card px-2 py-1 rounded text-[10px] font-black text-secondary whitespace-nowrap shadow-sm">+$150.00</div>
+<div class="w-full bg-slate-100 rounded-t-lg relative h-40 overflow-hidden ring-2 ring-secondary ring-offset-2">
+<div class="absolute bottom-0 w-full bg-secondary h-full"></div>
+</div>
+<span class="text-[10px] font-black text-primary">THU</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="w-full bg-slate-100 rounded-t-lg relative h-28 overflow-hidden">
+<div class="absolute bottom-0 w-full bg-secondary/80 h-1/2"></div>
+</div>
+<span class="text-[10px] font-bold text-slate-400">FRI</span>
+</div>
+</div>
+<div class="mt-8 space-y-3">
+<div class="flex justify-between items-center p-3 bg-surface-container-low rounded-2xl">
+<span class="text-xs font-bold text-slate-500 uppercase">Best Day</span>
+<span class="text-xs font-black text-secondary">Thursday (+$150.00)</span>
+</div>
+<div class="flex justify-between items-center p-3 bg-surface-container-low rounded-2xl">
+<span class="text-xs font-bold text-slate-500 uppercase">Worst Day</span>
+<span class="text-xs font-black text-error">Monday (-$35.00)</span>
+</div>
+</div>
+</div>
+<!-- Risk Monitor Card -->
+<div class="bg-gradient-to-br from-slate-900 to-slate-950 p-8 rounded-[2.5rem] shadow-2xl text-white">
+<div class="flex items-center gap-2 mb-8">
+<div class="w-2 h-2 rounded-full bg-secondary animate-ping"></div>
+<h2 class="text-sm font-black tracking-[0.2em] text-slate-400 uppercase">Risk Monitor</h2>
+</div>
+<div class="space-y-6">
+<div class="flex justify-between items-center group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">warning</span>
+<span class="text-xs font-medium text-slate-300">Max Drawdown</span>
+</div>
+<span class="text-sm font-bold text-error">-4.2%</span>
+</div>
+<div class="flex justify-between items-center group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">account_balance</span>
+<span class="text-xs font-medium text-slate-300">Daily Loss Limit</span>
+</div>
+<span class="text-sm font-bold text-slate-100">-$35.00 / $250</span>
+</div>
+<div class="flex justify-between items-center group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">analytics</span>
+<span class="text-xs font-medium text-slate-300">Sharpe Ratio</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-sm font-bold text-secondary">1.85</span>
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary/20 text-secondary rounded">Good</span>
+</div>
+</div>
+<div class="flex justify-between items-center group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">reorder</span>
+<span class="text-xs font-medium text-slate-300">Total Trades</span>
+</div>
+<span class="text-sm font-bold text-slate-100">215</span>
+</div>
+<div class="pt-6 border-t border-slate-800">
+<div class="flex justify-between items-end mb-2">
+<span class="text-xs font-bold text-slate-400">Portfolio Health</span>
+<span class="text-sm font-black text-secondary">92%</span>
+</div>
+<div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[92%] rounded-full shadow-[0_0_10px_#10B981]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Status Bar -->
+<footer class="fixed bottom-0 right-0 w-[calc(100%-16rem)] h-8 bg-primary/95 text-white flex items-center justify-between px-8 text-[10px] font-bold tracking-widest uppercase z-50">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 bg-secondary-fixed rounded-full"></span>
+                System Status: SYNCED &amp; OPERATIONAL
+            </div>
+<div class="flex items-center gap-4">
+<span>Latency: 24ms</span>
+<span class="text-primary-fixed">Next Trade Window: 12:00 UTC</span>
+</div>
+</footer>
+</main>
+<!-- FAB Suppression logic implementation - No FAB as per requirements -->
+</body></html>
