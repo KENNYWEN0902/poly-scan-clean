@@ -30,25 +30,32 @@ export default function Portfolio() {
   const [timeRange, setTimeRange] = useState('30D');
 
   const load = useCallback(async () => {
+    void api.getAccount().then(a => {
+      if (a) setAccount(a);
+    }).catch(() => {});
+
     try {
-      const [d, p, a] = await Promise.all([
-        api.getDashboard(),
-        api.getPerformance(),
-        api.getAccount(),
+      const [d, p] = await Promise.all([
+        api.getDashboard().catch(() => null),
+        api.getPerformance().catch(() => null),
       ]);
-      setDash(d);
-      setPerf(p);
-      setAccount(a);
+      if (d) setDash(d);
+      if (p) setPerf(p);
     } catch { /* fallback to empty */ }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     load();
-    api.connectWebSocket((type) => {
-      if (type === 'dashboard' || type === 'trade' || type === 'position') load();
-    });
-    return () => {};
+    const unsubscribers = [
+      api.subscribe('dashboard', () => load()),
+      api.subscribe('trade', () => load()),
+      api.subscribe('position', () => load()),
+    ];
+
+    return () => {
+      unsubscribers.forEach(unsubscribe => unsubscribe());
+    };
   }, [load]);
 
   const strategy = dash?.strategy;
@@ -105,7 +112,7 @@ export default function Portfolio() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400 text-sm font-medium">Loading dashboard...</div>
+        <div className="text-slate-400 text-sm font-medium">正在加载仪表盘...</div>
       </div>
     );
   }
@@ -116,39 +123,39 @@ export default function Portfolio() {
       <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
         <KpiCard
           icon="monetization_on" iconBg="bg-primary/10" iconColor="text-primary"
-          label="Total P&L"
+          label="总盈亏"
           value={`${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`}
-          trend={totalPnl >= 0 ? `${winRate.toFixed(1)}% win rate` : 'Needs improvement'}
+          trend={totalPnl >= 0 ? `胜率 ${winRate.toFixed(1)}%` : '仍需继续观察'}
           trendColor={totalPnl >= 0 ? 'text-secondary' : 'text-error'}
           trendIcon={totalPnl >= 0 ? 'trending_up' : 'trending_down'}
         />
         <KpiCard
           icon="bolt" iconBg="bg-secondary/10" iconColor="text-secondary"
-          label="Win Rate"
+          label="胜率"
           value={`${winRate.toFixed(1)}%`}
-          trend={`${totalTrades} total trades`}
+          trend={`总交易 ${totalTrades} 笔`}
           trendColor="text-secondary"
           trendIcon="add"
         />
         <KpiCard
           icon="south_east" iconBg="bg-orange-100" iconColor="text-orange-600"
-          label="Max Drawdown"
+          label="最大回撤"
           value={`-${maxDrawdown.toFixed(1)}%`}
-          trend={maxDrawdown > 5 ? 'Above threshold' : 'Within limits'}
+          trend={maxDrawdown > 5 ? '已超过阈值' : '在阈值范围内'}
           trendColor={maxDrawdown > 5 ? 'text-error' : 'text-secondary'}
         />
         <KpiCard
           icon="pie_chart" iconBg="bg-blue-100" iconColor="text-blue-600"
-          label="Current Exposure %"
+          label="当前仓位占比"
           value={exposure === null ? '--' : `${exposure.toFixed(0)}%`}
-          trend={exposure === null ? 'Awaiting wallet data' : 'Utilized capital'}
+          trend={exposure === null ? '等待钱包数据' : '资金已使用'}
           trendColor="text-slate-500"
         />
         <KpiCard
           icon="settings_input_component" iconBg="bg-violet-100" iconColor="text-violet-600"
-          label="Active Strategies"
+          label="运行中策略"
           value={strategy?.status === 'running' ? '1' : '0'}
-          trend={strategy?.status === 'running' ? '1 Running' : 'None active'}
+          trend={strategy?.status === 'running' ? '1 个运行中' : '暂无运行中的策略'}
           trendColor="text-slate-500"
         />
       </section>
@@ -161,8 +168,8 @@ export default function Portfolio() {
           <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow relative overflow-hidden">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-xl font-black text-slate-900">Equity Curve (30D)</h2>
-                <p className="text-sm text-slate-400 font-medium">Portfolio performance tracking</p>
+                <h2 className="text-xl font-black text-slate-900">资金曲线（30天）</h2>
+                <p className="text-sm text-slate-400 font-medium">组合表现跟踪</p>
               </div>
               <div className="flex gap-2 p-1 bg-surface-container-low rounded-xl">
                 {['1D', '7D', '30D', 'YTD', 'MAX'].map(r => (
@@ -220,9 +227,9 @@ export default function Portfolio() {
           <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
             <div className="flex items-center gap-8 mb-6 border-b border-slate-100">
               {([
-                { id: 'positions' as const, label: 'Open Positions' },
-                { id: 'trades' as const, label: 'Trade History' },
-                { id: 'log' as const, label: 'Execution Log' },
+                { id: 'positions' as const, label: '当前持仓' },
+                { id: 'trades' as const, label: '交易历史' },
+                { id: 'log' as const, label: '执行日志' },
               ]).map(tab => (
                 <button
                   key={tab.id}
@@ -249,7 +256,7 @@ export default function Portfolio() {
         <div className="col-span-12 lg:col-span-4 space-y-8">
           {/* Weekly Performance */}
           <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
-            <h2 className="text-xl font-black text-slate-900 mb-6">Weekly Performance</h2>
+            <h2 className="text-xl font-black text-slate-900 mb-6">本周表现</h2>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
@@ -262,7 +269,7 @@ export default function Portfolio() {
                       fontSize: '12px',
                       fontWeight: 700,
                     }}
-                    formatter={(value) => [`$${Number(value).toFixed(2)}`, 'P&L']}
+                    formatter={(value) => [`$${Number(value).toFixed(2)}`, '盈亏']}
                   />
                   <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
                     {weeklyData.map((entry, idx) => (
@@ -275,7 +282,7 @@ export default function Portfolio() {
             <div className="mt-8 space-y-3">
               {bestDay && (
                 <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-2xl">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Best Day</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase">最佳单日</span>
                   <span className="text-xs font-black text-secondary">
                     {bestDay.day} (+${bestDay.pnl.toFixed(2)})
                   </span>
@@ -283,7 +290,7 @@ export default function Portfolio() {
               )}
               {worstDay && (
                 <div className="flex justify-between items-center p-3 bg-surface-container-low rounded-2xl">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Worst Day</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase">最差单日</span>
                   <span className="text-xs font-black text-error">
                     {worstDay.day} (${worstDay.pnl.toFixed(2)})
                   </span>
@@ -296,17 +303,17 @@ export default function Portfolio() {
           <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-8 rounded-[2.5rem] shadow-2xl text-white">
             <div className="flex items-center gap-2 mb-8">
               <div className="w-2 h-2 rounded-full bg-secondary animate-ping" />
-              <h2 className="text-sm font-black tracking-[0.2em] text-slate-400 uppercase">Risk Monitor</h2>
+              <h2 className="text-sm font-black tracking-[0.2em] text-slate-400 uppercase">风险监控</h2>
             </div>
             <div className="space-y-6">
-              <RiskRow icon="warning" label="Max Drawdown" value={`-${maxDrawdown.toFixed(1)}%`} valueColor="text-red-400" />
-              <RiskRow icon="account_balance" label="Daily Loss Limit" value={`$${Math.abs(strategy?.daily_pnl || 0).toFixed(2)} / $250`} valueColor="text-slate-100" />
-              <RiskRow icon="analytics" label="Sharpe Ratio" value={sharpeRatio.toFixed(2)} valueColor="text-emerald-400" badge={sharpeRatio > 1 ? 'Good' : 'Low'} />
-              <RiskRow icon="reorder" label="Total Trades" value={String(totalTrades)} valueColor="text-slate-100" />
+              <RiskRow icon="warning" label="最大回撤" value={`-${maxDrawdown.toFixed(1)}%`} valueColor="text-red-400" />
+              <RiskRow icon="account_balance" label="单日亏损上限" value={`$${Math.abs(strategy?.daily_pnl || 0).toFixed(2)} / $250`} valueColor="text-slate-100" />
+              <RiskRow icon="analytics" label="夏普比率" value={sharpeRatio.toFixed(2)} valueColor="text-emerald-400" badge={sharpeRatio > 1 ? '良好' : '偏低'} />
+              <RiskRow icon="reorder" label="总交易数" value={String(totalTrades)} valueColor="text-slate-100" />
 
               <div className="pt-6 border-t border-slate-800">
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-xs font-bold text-slate-400">Portfolio Health</span>
+                  <span className="text-xs font-bold text-slate-400">资金健康度</span>
                   <span className="text-sm font-black text-emerald-400">{portfolioHealth.toFixed(0)}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -368,18 +375,18 @@ function RiskRow({ icon, label, value, valueColor, badge }: {
 
 function PositionsTable({ positions }: { positions: PositionInfo[] }) {
   if (!positions.length) {
-    return <div className="text-center py-8 text-slate-400 text-sm">No open positions</div>;
+    return <div className="text-center py-8 text-slate-400 text-sm">暂无持仓</div>;
   }
   return (
     <table className="w-full text-left">
       <thead>
         <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          <th className="pb-4 px-2">Market</th>
-          <th className="pb-4 px-2">Side</th>
-          <th className="pb-4 px-2">Quantity</th>
-          <th className="pb-4 px-2">Avg. Price</th>
-          <th className="pb-4 px-2">Current</th>
-          <th className="pb-4 px-2 text-right">P&L (%)</th>
+          <th className="pb-4 px-2">市场</th>
+          <th className="pb-4 px-2">方向</th>
+          <th className="pb-4 px-2">数量</th>
+          <th className="pb-4 px-2">均价</th>
+          <th className="pb-4 px-2">当前价</th>
+          <th className="pb-4 px-2 text-right">盈亏 (%)</th>
         </tr>
       </thead>
       <tbody className="text-sm">
@@ -410,18 +417,18 @@ function PositionsTable({ positions }: { positions: PositionInfo[] }) {
 
 function TradesTable({ trades }: { trades: TradeInfo[] }) {
   if (!trades.length) {
-    return <div className="text-center py-8 text-slate-400 text-sm">No recent trades</div>;
+    return <div className="text-center py-8 text-slate-400 text-sm">暂无最近交易</div>;
   }
   return (
     <table className="w-full text-left">
       <thead>
         <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          <th className="pb-4 px-2">Time</th>
-          <th className="pb-4 px-2">Market</th>
-          <th className="pb-4 px-2">Direction</th>
-          <th className="pb-4 px-2">Price</th>
-          <th className="pb-4 px-2">Size</th>
-          <th className="pb-4 px-2 text-right">P&L</th>
+          <th className="pb-4 px-2">时间</th>
+          <th className="pb-4 px-2">市场</th>
+          <th className="pb-4 px-2">方向</th>
+          <th className="pb-4 px-2">价格</th>
+          <th className="pb-4 px-2">金额</th>
+          <th className="pb-4 px-2 text-right">盈亏</th>
         </tr>
       </thead>
       <tbody className="text-sm">
@@ -452,16 +459,16 @@ function TradesTable({ trades }: { trades: TradeInfo[] }) {
 
 function LogTable({ alerts }: { alerts: { id: string; timestamp: string; type: string; level: string; message: string }[] }) {
   if (!alerts.length) {
-    return <div className="text-center py-8 text-slate-400 text-sm">No execution logs</div>;
+    return <div className="text-center py-8 text-slate-400 text-sm">暂无执行日志</div>;
   }
   return (
     <table className="w-full text-left">
       <thead>
         <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          <th className="pb-4 px-2">Time</th>
-          <th className="pb-4 px-2">Level</th>
-          <th className="pb-4 px-2">Type</th>
-          <th className="pb-4 px-2">Message</th>
+          <th className="pb-4 px-2">时间</th>
+          <th className="pb-4 px-2">级别</th>
+          <th className="pb-4 px-2">类型</th>
+          <th className="pb-4 px-2">信息</th>
         </tr>
       </thead>
       <tbody className="text-sm">

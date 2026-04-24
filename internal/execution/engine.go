@@ -508,7 +508,7 @@ func (e *Engine) ClaimPositions(conditionIDs []string) (*ClaimResult, error) {
 	return &result, nil
 }
 
-// AutoRedeem scans the user's wallet for settled positions and automatically redeems the USDC directly from CTF via Gnosis Safe or EOA
+// AutoRedeem scans the user's wallet for settled positions and automatically redeems pUSD directly from CTF via Gnosis Safe or EOA.
 func (e *Engine) AutoRedeem() (*ClaimResult, error) {
 	e.execSem <- struct{}{}
 	defer func() { <-e.execSem }()
@@ -557,7 +557,7 @@ func (e *Engine) AutoRedeem() (*ClaimResult, error) {
 				log.Printf("[AUTO_REDEEM] Python exited with error but produced parseable output")
 			}
 			if result.TotalClaimed > 0 {
-				log.Printf("[AUTO_REDEEM SUCCESS] Automatically redeemed %d settled positions directly to USDC!", result.TotalClaimed)
+				log.Printf("[AUTO_REDEEM SUCCESS] Automatically redeemed %d settled positions directly to pUSD!", result.TotalClaimed)
 			}
 			return &result, nil
 		}
@@ -581,7 +581,7 @@ func (e *Engine) AutoRedeem() (*ClaimResult, error) {
 	}
 
 	if result.TotalClaimed > 0 {
-		log.Printf("[AUTO_REDEEM SUCCESS] Automatically redeemed %d settled positions directly to USDC!", result.TotalClaimed)
+		log.Printf("[AUTO_REDEEM SUCCESS] Automatically redeemed %d settled positions directly to pUSD!", result.TotalClaimed)
 	}
 
 	return &result, nil
@@ -701,8 +701,8 @@ func (e *Engine) CheckBalances(tokenIDs []string) (map[string]float64, error) {
 	return response.Balances, nil
 }
 
-// CheckUSDCBalance queries the USDC.e balance of the current configured wallet
-func (e *Engine) CheckUSDCBalance() (float64, error) {
+// CheckCollateralBalance queries the available CLOB collateral balance (pUSD) of the current configured wallet.
+func (e *Engine) CheckCollateralBalance() (float64, error) {
 	e.execSem <- struct{}{}
 	defer func() { <-e.execSem }()
 
@@ -711,7 +711,7 @@ func (e *Engine) CheckUSDCBalance() (float64, error) {
 	}
 
 	request := map[string]string{
-		"action": "check_usdc_balance",
+		"action": "check_collateral_balance",
 	}
 
 	requestJSON, err := json.Marshal(request)
@@ -740,7 +740,7 @@ func (e *Engine) CheckUSDCBalance() (float64, error) {
 
 	err = cmd.Run()
 
-	type usdcResponse struct {
+	type collateralResponse struct {
 		Success bool    `json:"success"`
 		Balance float64 `json:"balance"`
 		Error   string  `json:"error,omitempty"`
@@ -748,29 +748,34 @@ func (e *Engine) CheckUSDCBalance() (float64, error) {
 
 	// Try parsing JSON output even if exit code is non-zero
 	if out.Len() > 0 {
-		var response usdcResponse
+		var response collateralResponse
 		if parseErr := json.Unmarshal(out.Bytes(), &response); parseErr == nil && response.Success {
 			if err != nil {
-				log.Printf("[USDC BALANCE] Python exited with error but produced parseable output")
+				log.Printf("[COLLATERAL BALANCE] Python exited with error but produced parseable output")
 			}
 			return response.Balance, nil
 		}
 	}
 
 	if err != nil {
-		log.Printf("[USDC BALANCE ERROR] Python script failed: %v", err)
+		log.Printf("[COLLATERAL BALANCE ERROR] Python script failed: %v", err)
 		log.Printf("Stderr: %s", stderr.String())
-		return 0, fmt.Errorf("USDC balance check failed: %v", err)
+		return 0, fmt.Errorf("collateral balance check failed: %v", err)
 	}
 
-	var response usdcResponse
+	var response collateralResponse
 	if err := json.Unmarshal(out.Bytes(), &response); err != nil {
-		return 0, fmt.Errorf("failed to parse USDC balance response: %v", err)
+		return 0, fmt.Errorf("failed to parse collateral balance response: %v", err)
 	}
 
 	if !response.Success {
-		return 0, fmt.Errorf("USDC balance check failed: %s", response.Error)
+		return 0, fmt.Errorf("collateral balance check failed: %s", response.Error)
 	}
 
 	return response.Balance, nil
+}
+
+// CheckUSDCBalance is a backward-compatible alias retained for older callers.
+func (e *Engine) CheckUSDCBalance() (float64, error) {
+	return e.CheckCollateralBalance()
 }

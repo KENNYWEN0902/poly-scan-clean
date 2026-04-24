@@ -1,6 +1,40 @@
 import { DashboardData, TechnicalIndicators, MarketInfo, PositionInfo, TradeInfo, AlertInfo, StrategyState, StrategyConfig, PricePoint, PerformanceStats, NotificationEvent, NotificationConfig, CostStats, DailyCost, AccountInfo } from './types';
 
-const API_BASE = '/api';
+function stripTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+function resolveApiBase(): string {
+  const override = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (override) {
+    return `${stripTrailingSlash(override)}/api`;
+  }
+
+  if (import.meta.env.DEV) {
+    return '/api';
+  }
+
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:9876/api`;
+}
+
+function resolveWebSocketUrl(): string {
+  const override = import.meta.env.VITE_WS_BASE_URL?.trim();
+  if (override) {
+    return `${stripTrailingSlash(override)}/ws`;
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (import.meta.env.DEV) {
+    return `${protocol}//${window.location.host}/ws`;
+  }
+
+  return `${protocol}//${window.location.hostname}:9876/ws`;
+}
+
+const API_BASE = resolveApiBase();
+const WS_URL = resolveWebSocketUrl();
+const REQUEST_TIMEOUT_MS = 12_000;
 
 class ApiService {
   private ws: WebSocket | null = null;
@@ -9,9 +43,24 @@ class ApiService {
 
   // 统一错误处理，如果 fetch 失败，则返回特定的错误标记，让 UI 处理显示
   private async safeFetch<T>(url: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(url, options);
-    if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
-    return response.json();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: options?.signal ?? controller.signal,
+      });
+      if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
+      return response.json();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error(`Fetch timed out: ${url}`);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
   }
 
   async getDashboard(): Promise<DashboardData> {
@@ -80,17 +129,30 @@ class ApiService {
     return res.stopped;
   }
 
+  subscribe(type: string, callback: (data: unknown) => void): () => void {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, new Set());
+    }
+
+    this.listeners.get(type)?.add(callback);
+
+    return () => {
+      const callbacks = this.listeners.get(type);
+      callbacks?.delete(callback);
+      if (callbacks?.size === 0) {
+        this.listeners.delete(type);
+      }
+    };
+  }
+
   connectWebSocket(
     onMessage: (type: string, data: unknown) => void,
     onStatusChange?: (status: 'connected' | 'disconnected' | 'reconnecting' | 'failed') => void
   ) {
     if (this.ws) this.ws.close();
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-
     try {
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket(WS_URL);
       this.ws.onopen = () => onStatusChange?.('connected');
       this.ws.onmessage = (event) => {
         try {

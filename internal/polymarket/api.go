@@ -22,19 +22,46 @@ type Client struct {
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
 		},
 	}
 }
 
 func (c *Client) doGET(url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	var lastErr error
+
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "poly-bot/1.0")
+
+		resp, err := c.httpClient.Do(req)
+		if err == nil {
+			if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
+				return resp, nil
+			}
+
+			if attempt == 2 {
+				return resp, nil
+			}
+
+			lastErr = fmt.Errorf("retryable status code: %d", resp.StatusCode)
+			resp.Body.Close()
+		} else {
+			lastErr = err
+			if attempt == 2 {
+				return nil, err
+			}
+		}
+
+		time.Sleep(time.Duration(attempt+1) * 750 * time.Millisecond)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "poly-bot/1.0")
-	return c.httpClient.Do(req)
+
+	return nil, lastErr
 }
 
 // GammaMarket represents a market from the Gamma API

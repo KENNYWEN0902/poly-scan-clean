@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
 Recover lost positions from Polymarket and save to positions.json
-This will query your wallet for open positions and create the positions file.
+This queries the V2 CLOB for open orders and recreates data/positions.json.
 """
 import os
 import sys
 import json
 from datetime import datetime, timedelta
 
-sys.path.insert(0, '/root/poly-scan')
+sys.path.insert(0, "/root/poly-scan")
 
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import ApiCreds
+from py_clob_client_v2 import ApiCreds, ClobClient
 
 def main():
     print("=== Position Recovery Tool ===\n")
@@ -31,7 +30,7 @@ def main():
     # Initialize client
     print("Connecting to Polymarket...", file=sys.stderr)
     client = ClobClient(
-        host="https://clob.polymarket.com",
+        host=os.environ.get("POLY_CLOB_HOST", "https://clob.polymarket.com"),
         key=private_key,
         chain_id=137,
         signature_type=signature_type,
@@ -48,7 +47,7 @@ def main():
     
     # Get open orders (these are positions that were placed)
     try:
-        orders = client.get_orders()
+        orders = client.get_open_orders()
         print(f"Found {len(orders)} orders", file=sys.stderr)
         
         # Convert to positions format
@@ -56,27 +55,36 @@ def main():
         now = datetime.utcnow()
         
         for order in orders:
-            market_id = order.get('market', 'unknown')
-            token_id = order.get('asset_id', '')
-            side = 'UP' if 'up' in token_id.lower() else 'DOWN'
-            price = float(order.get('price', 0))
-            size = float(order.get('original_size', 0))
+            market_id = order.get("market") or order.get("market_id") or "unknown"
+            token_id = order.get("asset_id") or order.get("token_id") or ""
+            side = str(order.get("side") or "BUY").upper()
+            price = float(order.get("price") or 0)
+            size = float(order.get("original_size") or order.get("size") or order.get("amount") or 0)
+
+            if not token_id or size <= 0:
+                continue
             
             # Estimate open time (use order creation time if available)
             open_time = now - timedelta(hours=1)  # Default: 1 hour ago
             
+            created_at = order.get("created_at") or order.get("createdAt") or ""
+            if created_at:
+                open_time_value = created_at
+            else:
+                open_time_value = open_time.isoformat() + "Z"
+
             position = {
                 "MarketID": market_id,
                 "TokenID": token_id,
                 "Side": side,
                 "EntryPrice": price,
                 "Size": size,
-                "OpenTime": open_time.isoformat() + "Z",
+                "OpenTime": open_time_value,
                 "IsActive": True,
                 "CloseReason": ""
             }
-            
-            positions[market_id] = position
+
+            positions[market_id or token_id] = position
         
         # Save to file
         os.makedirs('data', exist_ok=True)

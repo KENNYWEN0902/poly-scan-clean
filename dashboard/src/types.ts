@@ -181,6 +181,9 @@ export interface DailyCost {
 
 export interface AccountInfo {
   wallet_address: string;
+  collateral_symbol?: string;
+  collateral_balance?: number;
+  pusd_balance?: number;
   usdc_balance: number;
   positions_value: number;
   portfolio_value: number;

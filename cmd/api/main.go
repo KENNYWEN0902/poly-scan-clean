@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sort"
 	"strings"
@@ -24,6 +25,12 @@ import (
 	"poly-scan/internal/polymarket"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	accountCacheTTL    = 20 * time.Second
+	clobBalanceTimeout = 6 * time.Second
+	rpcBalanceTimeout  = 4 * time.Second
 )
 
 // API Server for monitoring dashboard
@@ -47,6 +54,11 @@ type APIServer struct {
 
 	userAddress string
 	stopChan    chan struct{}
+
+	accountMu      sync.Mutex
+	accountCache   AccountInfo
+	accountCacheAt time.Time
+	accountCacheOK bool
 }
 
 type MarketInfo struct {
@@ -221,7 +233,10 @@ func NewAPIServer() *APIServer {
 	return &APIServer{
 		client:      client,
 		spotMonitor: spotMonitor,
-		upgrader:    websocket.Upgrader{},
+		// Allow the dashboard to connect from a different public port in simple VPS deployments.
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool { return true },
+		},
 		markets:     make([]MarketInfo, 0),
 		positions:   make([]PositionInfo, 0),
 		trades:      make([]TradeInfo, 0),
@@ -607,7 +622,7 @@ func (s *APIServer) refreshTrades() {
 	// Track which markets have been processed
 	processedMarkets := make(map[string]bool)
 
-	var trades []TradeInfo
+	trades := make([]TradeInfo, 0)
 
 	// Primary source: positions.json (all positions our bot opened)
 	for slug, pos := range positionsByMarket {
@@ -708,10 +723,16 @@ func sortTradesByTime(trades []TradeInfo) {
 }
 
 func (s *APIServer) refreshMarkets() {
-	// Try to get markets from Gamma API (for non-BTC markets)
-	parsedMarkets, err := s.client.GetMarkets(50)
-	if err != nil {
-		log.Printf("[API] Failed to fetch markets: %v", err)
+	var parsedMarkets []polymarket.ParsedMarket
+
+	// Generic market browsing is optional for the dashboard. The BTC strategy and BTC cards
+	// use deterministic short-form markets, so skipping this avoids noisy Gamma list failures.
+	if envBool("POLY_DASHBOARD_FETCH_GENERIC_MARKETS") {
+		var err error
+		parsedMarkets, err = s.client.GetMarkets(50)
+		if err != nil {
+			log.Printf("[API] Failed to fetch non-BTC dashboard markets: %v", err)
+		}
 	}
 
 	var markets []MarketInfo
@@ -851,6 +872,44 @@ func firstNonZeroFloat(values ...float64) float64 {
 		}
 	}
 	return 0
+}
+
+func envBool(key string) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	return value == "1" || value == "true" || value == "yes"
+}
+
+func notificationEventsToAlerts(events []notification.Event) []AlertInfo {
+	alerts := make([]AlertInfo, 0, len(events))
+
+	for _, event := range events {
+		details := ""
+		if len(event.Data) > 0 {
+			if raw, err := json.Marshal(event.Data); err == nil {
+				details = string(raw)
+			}
+		}
+
+		alerts = append(alerts, AlertInfo{
+			ID:        fmt.Sprintf("%s:%s:%s", event.Timestamp.Format(time.RFC3339Nano), event.Type, event.MarketID),
+			Timestamp: event.Timestamp,
+			Type:      string(event.Type),
+			Level:     string(event.Level),
+			Message:   event.Message,
+			Details:   details,
+		})
+	}
+
+	return alerts
+}
+
+func limitAlerts(alerts []AlertInfo, limit int) []AlertInfo {
+	if limit <= 0 || len(alerts) <= limit {
+		return append([]AlertInfo(nil), alerts...)
+	}
+
+	start := len(alerts) - limit
+	return append([]AlertInfo(nil), alerts[start:]...)
 }
 
 func buildPositionInfo(pos polymarket.Position, fallbackCurrentPrice float64) PositionInfo {
@@ -1049,6 +1108,9 @@ func (s *APIServer) getCurrentIndicators() TechnicalIndicators {
 }
 
 func (s *APIServer) getRecentTrades(limit int) []TradeInfo {
+	if s.trades == nil {
+		return []TradeInfo{}
+	}
 	if len(s.trades) <= limit {
 		return s.trades
 	}
@@ -1056,10 +1118,15 @@ func (s *APIServer) getRecentTrades(limit int) []TradeInfo {
 }
 
 func (s *APIServer) getRecentAlerts(limit int) []AlertInfo {
-	if len(s.alerts) <= limit {
-		return s.alerts
+	events := s.loadNotificationEvents()
+	if len(events) > 0 {
+		return limitAlerts(notificationEventsToAlerts(events), limit)
 	}
-	return s.alerts[len(s.alerts)-limit:]
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return limitAlerts(s.alerts, limit)
 }
 
 func (s *APIServer) getPriceHistory(limit int) []PricePoint {
@@ -1388,12 +1455,15 @@ func (s *APIServer) handleCostsDaily(w http.ResponseWriter, r *http.Request) {
 
 // AccountInfo returned by /api/account
 type AccountInfo struct {
-	WalletAddress  string        `json:"wallet_address"`
-	USDCBalance    float64       `json:"usdc_balance"`
-	PositionsValue float64       `json:"positions_value"`
-	PortfolioValue float64       `json:"portfolio_value"`
-	DailyStats     []DailyStat   `json:"daily_stats"`
-	EquityCurve    []EquityPoint `json:"equity_curve"`
+	WalletAddress     string        `json:"wallet_address"`
+	CollateralSymbol  string        `json:"collateral_symbol"`
+	CollateralBalance float64       `json:"collateral_balance"`
+	PUSDBalance       float64       `json:"pusd_balance"`
+	USDCBalance       float64       `json:"usdc_balance"` // Deprecated alias kept for older dashboard builds.
+	PositionsValue    float64       `json:"positions_value"`
+	PortfolioValue    float64       `json:"portfolio_value"`
+	DailyStats        []DailyStat   `json:"daily_stats"`
+	EquityCurve       []EquityPoint `json:"equity_curve"`
 }
 
 type DailyStat struct {
@@ -1434,7 +1504,7 @@ func positionMarketValue(pos PositionInfo) float64 {
 	return 0
 }
 
-func buildAccountInfo(address string, usdcBalance float64, positions []PositionInfo, perf accountPerformanceSnapshot) AccountInfo {
+func buildAccountInfo(address string, collateralBalance float64, positions []PositionInfo, perf accountPerformanceSnapshot) AccountInfo {
 	positionsValue := 0.0
 	for _, pos := range positions {
 		if pos.IsActive {
@@ -1450,7 +1520,7 @@ func buildAccountInfo(address string, usdcBalance float64, positions []PositionI
 	}
 	sort.Strings(dates)
 
-	portfolioValue := usdcBalance + positionsValue
+	portfolioValue := collateralBalance + positionsValue
 	startingCapital := portfolioValue - perf.TotalPnL
 	if startingCapital < 0 {
 		startingCapital = 0
@@ -1477,23 +1547,29 @@ func buildAccountInfo(address string, usdcBalance float64, positions []PositionI
 	}
 
 	return AccountInfo{
-		WalletAddress:  address,
-		USDCBalance:    usdcBalance,
-		PositionsValue: positionsValue,
-		PortfolioValue: portfolioValue,
-		DailyStats:     dailyStats,
-		EquityCurve:    equityCurve,
+		WalletAddress:     address,
+		CollateralSymbol:  "pUSD",
+		CollateralBalance: collateralBalance,
+		PUSDBalance:       collateralBalance,
+		USDCBalance:       collateralBalance,
+		PositionsValue:    positionsValue,
+		PortfolioValue:    portfolioValue,
+		DailyStats:        dailyStats,
+		EquityCurve:       equityCurve,
 	}
 }
 
-// queryUSDCBalance queries USDC.e balance from Polygon RPC
-func queryUSDCBalance(walletAddress string) (float64, error) {
-	usdceContract := "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+// queryPUSDBalance queries the on-chain pUSD balance from Polygon RPC.
+func queryPUSDBalance(walletAddress string) (float64, error) {
+	pusdContract := "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
 	// balanceOf(address) = 0x70a08231 + address padded to 32 bytes
 	addr := strings.TrimPrefix(strings.ToLower(walletAddress), "0x")
 	data := "0x70a08231" + strings.Repeat("0", 24) + addr
 
-	rpcURL := os.Getenv("POLYGON_RPC_URL")
+	rpcURL := os.Getenv("POLY_RPC_URL")
+	if rpcURL == "" {
+		rpcURL = os.Getenv("POLYGON_RPC_URL")
+	}
 	if rpcURL == "" {
 		rpcURL = "https://polygon-bor-rpc.publicnode.com"
 	}
@@ -1503,7 +1579,7 @@ func queryUSDCBalance(walletAddress string) (float64, error) {
 		"method":  "eth_call",
 		"params": []interface{}{
 			map[string]string{
-				"to":   usdceContract,
+				"to":   pusdContract,
 				"data": data,
 			},
 			"latest",
@@ -1512,7 +1588,8 @@ func queryUSDCBalance(walletAddress string) (float64, error) {
 	}
 
 	jsonBody, _ := json.Marshal(body)
-	resp, err := http.Post(rpcURL, "application/json", bytes.NewReader(jsonBody))
+	client := &http.Client{Timeout: rpcBalanceTimeout}
+	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(jsonBody))
 	if err != nil {
 		return 0, fmt.Errorf("RPC call failed: %w", err)
 	}
@@ -1531,7 +1608,7 @@ func queryUSDCBalance(walletAddress string) (float64, error) {
 		return 0, fmt.Errorf("RPC error: %s", rpcResp.Error.Message)
 	}
 
-	// Parse hex result → uint256 → float64 with 6 decimals (USDC.e)
+	// Parse hex result → uint256 → float64 with 6 decimals (pUSD)
 	hexStr := strings.TrimPrefix(rpcResp.Result, "0x")
 	if hexStr == "" || hexStr == "0" {
 		return 0, nil
@@ -1541,12 +1618,94 @@ func queryUSDCBalance(walletAddress string) (float64, error) {
 		return 0, fmt.Errorf("decode hex: %w", err)
 	}
 	balance := new(big.Int).SetBytes(rawBytes)
-	// USDC.e has 6 decimals
+	// pUSD has 6 decimals.
 	balFloat := new(big.Float).SetInt(balance)
 	divisor := new(big.Float).SetFloat64(math.Pow10(6))
 	result := new(big.Float).Quo(balFloat, divisor)
 	f, _ := result.Float64()
 	return f, nil
+}
+
+func queryCLOBCollateralBalance() (float64, error) {
+	if strings.TrimSpace(os.Getenv("POLY_PRIVATE_KEY")) == "" {
+		return 0, fmt.Errorf("POLY_PRIVATE_KEY is required for CLOB collateral balance")
+	}
+
+	requestJSON := []byte(`{"action":"check_collateral_balance"}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), clobBalanceTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "python3", "scripts/executor.py")
+	cmd.Stdin = bytes.NewReader(requestJSON)
+	cmd.Env = os.Environ()
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	var response struct {
+		Success bool    `json:"success"`
+		Balance float64 `json:"balance"`
+		Error   string  `json:"error,omitempty"`
+	}
+	if parseErr := json.Unmarshal(out.Bytes(), &response); parseErr != nil {
+		if err != nil {
+			return 0, fmt.Errorf("collateral balance command failed: %w; stderr: %s", err, strings.TrimSpace(stderr.String()))
+		}
+		return 0, fmt.Errorf("failed to parse collateral balance response: %w; stdout: %s", parseErr, strings.TrimSpace(out.String()))
+	}
+
+	if err != nil && !response.Success {
+		return 0, fmt.Errorf("collateral balance command failed: %w; stderr: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	if !response.Success {
+		return 0, fmt.Errorf("collateral balance check failed: %s", response.Error)
+	}
+
+	return response.Balance, nil
+}
+
+func (s *APIServer) buildFreshAccountInfo(address string, fallbackBalance float64, hasFallbackBalance bool) AccountInfo {
+	s.mu.RLock()
+	positions := append([]PositionInfo(nil), s.positions...)
+	s.mu.RUnlock()
+
+	var collateralBalance float64
+	if clobBalance, err := queryCLOBCollateralBalance(); err == nil {
+		collateralBalance = clobBalance
+	} else {
+		log.Printf("[API] Failed to query CLOB collateral balance: %v", err)
+		if onChainBalance, chainErr := queryPUSDBalance(address); chainErr == nil {
+			if onChainBalance > 0 || !hasFallbackBalance {
+				collateralBalance = onChainBalance
+			} else {
+				collateralBalance = fallbackBalance
+			}
+		} else {
+			log.Printf("[API] Failed to query on-chain pUSD balance for %s: %v", address, chainErr)
+			if hasFallbackBalance {
+				collateralBalance = fallbackBalance
+			}
+		}
+	}
+
+	var perf accountPerformanceSnapshot
+	perfFile := "data/performance.json"
+	if raw, err := os.ReadFile(perfFile); err == nil {
+		if err := json.Unmarshal(raw, &perf); err != nil {
+			log.Printf("[API] Failed to parse performance snapshot: %v", err)
+		}
+	}
+
+	return buildAccountInfo(address, collateralBalance, positions, perf)
+}
+
+func cachedCollateralBalance(account AccountInfo) float64 {
+	return firstNonZeroFloat(account.CollateralBalance, account.PUSDBalance, account.USDCBalance)
 }
 
 func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) {
@@ -1558,26 +1717,27 @@ func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mu.RLock()
-	positions := append([]PositionInfo(nil), s.positions...)
-	s.mu.RUnlock()
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
 
-	var usdcBalance float64
-	if onChainBalance, err := queryUSDCBalance(address); err == nil {
-		usdcBalance = onChainBalance
-	} else {
-		log.Printf("[API] Failed to query on-chain USDC balance for %s: %v", address, err)
+	if s.accountCacheOK && time.Since(s.accountCacheAt) < accountCacheTTL {
+		json.NewEncoder(w).Encode(s.accountCache)
+		return
 	}
 
-	var perf accountPerformanceSnapshot
-	perfFile := "data/performance.json"
-	if raw, err := os.ReadFile(perfFile); err == nil {
-		if err := json.Unmarshal(raw, &perf); err != nil {
-			log.Printf("[API] Failed to parse performance snapshot: %v", err)
-		}
+	fallbackBalance := 0.0
+	hasFallbackBalance := false
+	if s.accountCacheOK {
+		fallbackBalance = cachedCollateralBalance(s.accountCache)
+		hasFallbackBalance = fallbackBalance > 0
 	}
 
-	json.NewEncoder(w).Encode(buildAccountInfo(address, usdcBalance, positions, perf))
+	account := s.buildFreshAccountInfo(address, fallbackBalance, hasFallbackBalance)
+	s.accountCache = account
+	s.accountCacheAt = time.Now()
+	s.accountCacheOK = true
+
+	json.NewEncoder(w).Encode(account)
 }
 
 func main() {

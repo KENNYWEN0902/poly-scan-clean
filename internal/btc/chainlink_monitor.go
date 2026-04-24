@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,9 +70,6 @@ func (c *ChainlinkMonitor) Stop() {
 // monitorLoop maintains WebSocket connection with automatic reconnection
 // Falls back to Binance HTTP polling when WebSocket is unavailable
 func (c *ChainlinkMonitor) monitorLoop() {
-	wsFailures := 0
-	const maxWSFailures = 1 // Switch to HTTP after first WS failure (RTDS often unavailable)
-
 	for {
 		select {
 		case <-c.stopChan:
@@ -79,20 +77,13 @@ func (c *ChainlinkMonitor) monitorLoop() {
 		default:
 		}
 
-		if wsFailures < maxWSFailures {
-			if err := c.connectAndListen(); err != nil {
-				wsFailures++
-				fmt.Printf("[CHAINLINK] WebSocket failed, switching to HTTP polling (Binance): %v\n", err)
-				continue
-			}
-			wsFailures = 0
-		} else {
-			// Pure HTTP fallback mode — poll Binance every 3 seconds
+		if err := c.connectAndListen(); err != nil {
+			fmt.Printf("[CHAINLINK] RTDS WebSocket disconnected, retrying in 5s: %v\n", err)
 			c.fetchFallbackPrice()
 			select {
 			case <-c.stopChan:
 				return
-			case <-time.After(3 * time.Second):
+			case <-time.After(5 * time.Second):
 			}
 		}
 	}
@@ -110,17 +101,42 @@ func (c *ChainlinkMonitor) connectAndListen() error {
 	c.wsConn = conn
 	c.mu.Unlock()
 
-	// Subscribe to Chainlink crypto prices
+	// Subscribe using the current Polymarket RTDS protocol.
+	// Docs: action + subscriptions, topic/type/filters, and periodic PING keepalive.
 	subscription := map[string]interface{}{
-		"type":    "subscribe",
-		"channel": "crypto_prices_chainlink",
+		"action": "subscribe",
+		"subscriptions": []map[string]string{
+			{
+				"topic":   "crypto_prices_chainlink",
+				"type":    "*",
+				"filters": `{"symbol":"btc/usd"}`,
+			},
+		},
 	}
 
 	if err := conn.WriteJSON(subscription); err != nil {
 		return fmt.Errorf("subscription failed: %w", err)
 	}
 
-	fmt.Printf("[CHAINLINK] Connected to Polymarket RTDS for Chainlink prices\n")
+	fmt.Printf("[CHAINLINK] Connected to Polymarket RTDS for Chainlink BTC/USD prices\n")
+
+	pingDone := make(chan struct{})
+	defer close(pingDone)
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-pingDone:
+				return
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.TextMessage, []byte("PING")); err != nil {
+					return
+				}
+			}
+		}
+	}()
 
 	// Listen for messages
 	for {
@@ -130,19 +146,10 @@ func (c *ChainlinkMonitor) connectAndListen() error {
 		default:
 		}
 
-		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 
-		var msg struct {
-			Type    string `json:"type"`
-			Channel string `json:"channel"`
-			Data    struct {
-				Asset     string  `json:"asset"`
-				Price     float64 `json:"price"`
-				Timestamp int64   `json:"timestamp"` // milliseconds
-			} `json:"data"`
-		}
-
-		if err := conn.ReadJSON(&msg); err != nil {
+		_, raw, err := conn.ReadMessage()
+		if err != nil {
 			// Try fallback on read error
 			if c.fallbackEnabled {
 				c.fetchFallbackPrice()
@@ -150,10 +157,46 @@ func (c *ChainlinkMonitor) connectAndListen() error {
 			return fmt.Errorf("read error: %w", err)
 		}
 
-		// Process BTC price updates
-		if msg.Channel == "crypto_prices_chainlink" && msg.Data.Asset == "BTC" {
-			c.addPricePoint(msg.Data.Price, time.Unix(msg.Data.Timestamp/1000, 0), "chainlink_rtds")
+		message := strings.TrimSpace(string(raw))
+		if message == "" || strings.EqualFold(message, "PONG") || strings.EqualFold(message, "PING") {
+			continue
 		}
+
+		var msg struct {
+			Topic     string `json:"topic"`
+			Type      string `json:"type"`
+			Timestamp int64  `json:"timestamp"` // milliseconds
+			Payload   struct {
+				Symbol    string  `json:"symbol"`
+				Value     float64 `json:"value"`
+				Timestamp int64   `json:"timestamp"` // milliseconds
+			} `json:"payload"`
+		}
+
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			fmt.Printf("[CHAINLINK] Ignoring non-JSON RTDS message: %s\n", message)
+			continue
+		}
+
+		if msg.Topic != "crypto_prices_chainlink" {
+			continue
+		}
+		if msg.Payload.Symbol != "btc/usd" {
+			continue
+		}
+		if msg.Payload.Value <= 0 {
+			continue
+		}
+
+		timestamp := msg.Payload.Timestamp
+		if timestamp == 0 {
+			timestamp = msg.Timestamp
+		}
+		if timestamp == 0 {
+			timestamp = time.Now().UnixMilli()
+		}
+
+		c.addPricePoint(msg.Payload.Value, time.UnixMilli(timestamp), "chainlink_rtds")
 	}
 }
 
@@ -215,6 +258,11 @@ func (c *ChainlinkMonitor) addPricePoint(price float64, timestamp time.Time, sou
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	previousSource := ""
+	if len(c.priceHistory) > 0 {
+		previousSource = c.priceHistory[len(c.priceHistory)-1].Source
+	}
+
 	c.priceHistory = append(c.priceHistory, ChainlinkPricePoint{
 		Price:     price,
 		Timestamp: timestamp,
@@ -232,6 +280,10 @@ func (c *ChainlinkMonitor) addPricePoint(price float64, timestamp time.Time, sou
 	}
 	if idx > 0 {
 		c.priceHistory = c.priceHistory[idx:]
+	}
+
+	if source == "chainlink_rtds" && previousSource != "chainlink_rtds" {
+		fmt.Printf("[CHAINLINK] RTDS BTC/USD price established: $%.2f\n", price)
 	}
 
 	// Log every 30 points

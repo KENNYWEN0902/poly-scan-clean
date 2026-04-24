@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PolymarketBot 服务器从 V1 升级到 V2 的详细教程</title>
+    <style>
+      :root {
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --panel-soft: #f8fafc;
+        --text: #15202b;
+        --muted: #566372;
+        --line: #d7dee7;
+        --accent: #0f766e;
+        --accent-soft: #ecfeff;
+        --warn: #92400e;
+        --warn-soft: #fff7ed;
+        --danger: #991b1b;
+        --danger-soft: #fef2f2;
+        --code-bg: #0f172a;
+        --code-line: #1e293b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #eef4f7 0%, #f7fafb 100%);
+        color: var(--text);
+        font-family: "PingFang SC", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.75;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 28px 18px 56px;
+      }
+      .hero, .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.06);
+      }
+      .hero {
+        padding: 28px;
+        margin-bottom: 18px;
+      }
+      .card {
+        padding: 28px;
+        margin-bottom: 18px;
+      }
+      h1, h2, h3 {
+        line-height: 1.3;
+        margin: 0;
+      }
+      h1 {
+        font-size: 36px;
+        margin-bottom: 10px;
+      }
+      h2 {
+        font-size: 24px;
+        margin-top: 30px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+      h3 {
+        font-size: 18px;
+        margin-top: 20px;
+      }
+      p, li {
+        font-size: 16px;
+      }
+      p {
+        margin: 12px 0;
+      }
+      ul, ol {
+        margin: 10px 0 14px;
+        padding-left: 22px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #edf2f7;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 0.95em;
+      }
+      pre {
+        margin: 14px 0 18px;
+        padding: 16px;
+        border-radius: 14px;
+        background: var(--code-bg);
+        color: #e2e8f0;
+        border: 1px solid var(--code-line);
+        overflow-x: auto;
+      }
+      pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .badge {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--panel-soft);
+        border: 1px solid var(--line);
+        font-size: 14px;
+      }
+      .note, .warn, .danger {
+        padding: 16px 18px;
+        border-radius: 16px;
+        margin: 16px 0;
+      }
+      .note {
+        background: var(--accent-soft);
+        border: 1px solid #a5f3fc;
+      }
+      .warn {
+        background: var(--warn-soft);
+        border: 1px solid #fed7aa;
+        color: var(--warn);
+      }
+      .danger {
+        background: var(--danger-soft);
+        border: 1px solid #fecaca;
+        color: var(--danger);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+        margin: 18px 0;
+      }
+      .mini {
+        background: var(--panel-soft);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .mini strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+      }
+      th, td {
+        padding: 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--panel-soft);
+      }
+      .toc a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .toc li {
+        margin: 4px 0;
+      }
+      .sep {
+        height: 1px;
+        background: var(--line);
+        margin: 26px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>PolymarketBot 服务器从 V1 升级到 V2 的详细教程</h1>
+        <p class="muted">更新时间：2026-04-24</p>
+        <p>这是一份专门给“代码和服务器小白”准备的升级手册。目标不是讲概念，而是让你按顺序一步一步做完，并且尽量不碰你现有的策略文件和服务器配置。</p>
+        <div class="badge-row">
+          <div class="badge">不覆盖整个项目目录</div>
+          <div class="badge">不重建服务器 .env</div>
+          <div class="badge">不改你的策略文件</div>
+          <div class="badge">支持先试跑 V2</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2026-04-24 补充：已验证运行修复</h2>
+        <div class="note">
+          正式本地项目目录已经统一为 <code>/Users/kennywen/Documents/Playground/polymarketbot</code>。此前临时 Codex 目录里的 RTDS、pUSD 余额、历史页、API 超时缓存和 WebSocket 状态修复，已经同步回正式项目。后续上传服务器时请以 Playground 目录为准。
+        </div>
+        <ul>
+          <li>ChainlinkMonitor 使用当前 Polymarket RTDS 协议，并添加 PING 保活和持续重连。</li>
+          <li><code>/api/account</code> 优先查询 CLOB collateral/pUSD，带短超时和 20 秒缓存。</li>
+          <li>Dashboard 历史页兼容 <code>/api/trades</code> 返回 <code>[]</code>。</li>
+          <li>Dashboard 所有 REST 请求有 12 秒超时，慢接口不会拖死整页。</li>
+          <li>首页不再重复创建 WebSocket，左下角在线状态不会误报离线。</li>
+        </ul>
+      </section>
+
+      <section class="card toc">
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#conclusion">最重要的结论</a></li>
+          <li><a href="#time">官方切换时间</a></li>
+          <li><a href="#concepts">4 个基础词</a></li>
+          <li><a href="#prepare">升级前准备</a></li>
+          <li><a href="#step0">第 0 步：确认你在改哪台机器</a></li>
+          <li><a href="#step1">第 1 步：服务器备份</a></li>
+          <li><a href="#step2">第 2 步：检查并修改 .env</a></li>
+          <li><a href="#step3">第 3 步：上传最小升级文件</a></li>
+          <li><a href="#step4">第 4 步：可选升级 API / Dashboard</a></li>
+          <li><a href="#step5">第 5 步：检查文件是否上传成功</a></li>
+          <li><a href="#step6">第 6 步：安装 V2 Python 依赖</a></li>
+          <li><a href="#step7">第 7 步：判断你是不是 Safe / Proxy 路线</a></li>
+          <li><a href="#step8">第 8 步：准备 pUSD</a></li>
+          <li><a href="#step9">第 9 步：做连通性测试</a></li>
+          <li><a href="#step10">第 10 步：需不需要重新编译</a></li>
+          <li><a href="#step11">第 11 步：如何正确重启 PM2</a></li>
+          <li><a href="#step12">第 12 步：看日志</a></li>
+          <li><a href="#step13">第 13 步：现在就跑 V2</a></li>
+          <li><a href="#step14">第 14 步：切换当天怎么做</a></li>
+          <li><a href="#rollback">失败后如何回滚</a></li>
+          <li><a href="#pitfalls">最常见的坑</a></li>
+        </ol>
+      </section>
+
+      <section class="card" id="conclusion">
+        <h2>最重要的结论</h2>
+
+        <div class="grid">
+          <div class="mini">
+            <strong>1. `.env` 不需要整体重建</strong>
+            只需要手动检查少量字段。最关键的是 <code>POLY_CLOB_HOST</code>、可选的 <code>POLY_RPC_URL</code>，原来的私钥、签名类型、funder 地址一般不要乱动。
+          </div>
+          <div class="mini">
+            <strong>2. 你的策略文件不要动</strong>
+            这次升级不要上传 <code>internal/btc/predictor.go</code>、<code>internal/btc/risk_manager.go</code>、<code>internal/btc/strategy.go</code>。
+          </div>
+          <div class="mini">
+            <strong>3. 最小升级至少更新 2 个核心文件</strong>
+            <code>scripts/executor.py</code> 和 <code>ecosystem.config.js</code>。前者负责 V2 交互，后者负责把新环境变量送进 PM2 进程。
+          </div>
+          <div class="mini">
+            <strong>4. V2 下单看的是 pUSD</strong>
+            不是只有 <code>USDC.e</code> 就行。真正可下单的是 <code>pUSD</code> collateral。
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>分类</th>
+              <th>文件</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>最小升级必须更新</td>
+              <td><code>scripts/executor.py</code>、<code>ecosystem.config.js</code></td>
+            </tr>
+            <tr>
+              <td>建议一起更新</td>
+              <td><code>scripts/recover_positions.py</code>、<code>scripts/ctf_redeem.py</code>、<code>scripts/claim_rewards.py</code>、<code>scripts/wrap_pusd.py</code></td>
+            </tr>
+            <tr>
+              <td>需要页面和 API 也显示 pUSD 时再更新</td>
+              <td><code>cmd/api/main.go</code>、<code>cmd/api/main_test.go</code>、<code>internal/btc/chainlink_monitor.go</code>、<code>internal/btc/predictor.go</code>、<code>internal/polymarket/api.go</code>、<code>dashboard/src/App.tsx</code>、<code>dashboard/src/api.ts</code>、<code>dashboard/src/pages/PnlHistory.tsx</code>、<code>dashboard/src/pages/Portfolio.tsx</code>、<code>dashboard/src/pages/Positions.tsx</code>、<code>dashboard/src/pages/Settings.tsx</code></td>
+            </tr>
+            <tr>
+              <td>仍然不要覆盖</td>
+              <td><code>internal/btc/risk_manager.go</code>、<code>internal/btc/strategy.go</code>、服务器上的 <code>.env</code>、<code>data/</code>、<code>logs/</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warn">
+          如果你只改了服务器上的 <code>.env</code>，但没有更新 <code>ecosystem.config.js</code>，那 PM2 进程不一定能读到新的 <code>POLY_CLOB_HOST</code>、<code>POLY_RPC_URL</code>、<code>POLY_BUILDER_CODE</code>。这是最常见的“我明明改了配置却不生效”的原因。
+        </div>
+      </section>
+
+      <section class="card" id="time">
+        <h2>官方切换时间</h2>
+        <p>Polymarket 官方目前写的是：</p>
+        <ul>
+          <li>CLOB V2 正式切换时间：<code>2026-04-28 约 11:00 UTC</code></li>
+          <li>对应北京时间：<code>2026-04-28 19:00</code> 左右</li>
+          <li>会有大约 1 小时停机</li>
+          <li>旧挂单会被清空</li>
+          <li>V1 旧客户端 / 旧 SDK 路线届时会失效</li>
+        </ul>
+        <div class="note">
+          现在到 <code>2026-04-28 19:00</code> 北京时间之前，你可以继续跑 V1，也可以提前试跑 V2。提前试跑 V2 时，请把 <code>POLY_CLOB_HOST</code> 指向 <code>https://clob-v2.polymarket.com</code>。
+        </div>
+      </section>
+
+      <section class="card" id="concepts">
+        <h2>4 个基础词</h2>
+        <div class="grid">
+          <div class="mini">
+            <strong>本地 Mac</strong>
+            就是你眼前这台电脑。你的本地项目目录是 <code>/Users/kennywen/Documents/Playground/polymarketbot</code>。
+          </div>
+          <div class="mini">
+            <strong>服务器</strong>
+            就是你现在跑 V1 机器人的那台 Linux 机器。教程默认项目目录是 <code>/root/poly-scan</code>。
+          </div>
+          <div class="mini">
+            <strong>上传文件</strong>
+            这次不是把整个文件夹覆盖过去，而是把少量文件从 Mac 复制到服务器同名位置。
+          </div>
+          <div class="mini">
+            <strong>PM2</strong>
+            这是你守护 <code>poly-bot-btc</code>、<code>poly-bot-api</code>、<code>poly-dashboard</code> 的进程工具。
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="prepare">
+        <h2>升级前准备</h2>
+        <ol>
+          <li>你知道服务器 IP。</li>
+          <li>你能正常 <code>ssh</code> 登录服务器。</li>
+          <li>你知道服务器上的项目目录。</li>
+          <li>你知道自己是否在用 PM2。</li>
+          <li>你有权限查看和编辑服务器上的 <code>.env</code>。</li>
+        </ol>
+        <p>如果你不确定项目目录在哪，先登录服务器执行：</p>
+        <pre><code>pwd
+ls
+pm2 list</code></pre>
+      </section>
+
+      <section class="card" id="step0">
+        <h2>第 0 步：先确认你现在到底在改哪台机器</h2>
+        <p>你会在两个终端之间来回切换：</p>
+        <ul>
+          <li>终端 A：Mac 本地终端。负责上传文件。</li>
+          <li>终端 B：服务器终端。负责备份、改 <code>.env</code>、安装依赖、重启服务。</li>
+        </ul>
+        <p>先在 Mac 本地终端登录服务器：</p>
+        <pre><code>ssh root@你的服务器IP</code></pre>
+        <p>登录成功后先执行：</p>
+        <pre><code>whoami
+pwd
+ls /root
+pm2 list</code></pre>
+        <div class="warn">
+          如果你发现项目根本不在 <code>/root/poly-scan</code>，比如在 <code>/home/ubuntu/poly-scan</code>，那么后面所有命令里的路径都要一起替换。
+        </div>
+      </section>
+
+      <section class="card" id="step1">
+        <h2>第 1 步：先做备份</h2>
+        <p>进入项目目录的上一级：</p>
+        <pre><code>cd /root</code></pre>
+        <p>执行备份命令：</p>
+        <pre><code>cp -a poly-scan poly-scan.backup-$(date +%F-%H%M%S)
+cp /root/poly-scan/.env /root/poly-scan/.env.backup-$(date +%F-%H%M%S)</code></pre>
+        <p>然后确认备份成功：</p>
+        <pre><code>ls -ld /root/poly-scan.backup-*
+ls -l /root/poly-scan/.env.backup-*</code></pre>
+      </section>
+
+      <section class="card" id="step2">
+        <h2>第 2 步：检查并修改服务器上的 .env</h2>
+        <pre><code>cd /root/poly-scan
+grep -n '^POLY_' .env</code></pre>
+        <p>你重点看这些变量：</p>
+        <ul>
+          <li><code>POLY_PRIVATE_KEY</code>：一般不改</li>
+          <li><code>POLY_SIGNATURE_TYPE</code>：一般不改</li>
+          <li><code>POLY_FUNDER_ADDRESS</code>：一般不改</li>
+          <li><code>POLY_CLOB_HOST</code>：现在想提前试跑 V2 就加</li>
+          <li><code>POLY_RPC_URL</code>：可选但推荐</li>
+          <li><code>POLY_BUILDER_CODE</code>：有才填，没有不要乱填</li>
+        </ul>
+        <p>如果你现在就想试跑 V2，用 <code>nano</code> 打开：</p>
+        <pre><code>nano .env</code></pre>
+        <p>至少补上：</p>
+        <pre><code>POLY_CLOB_HOST=https://clob-v2.polymarket.com</code></pre>
+        <p>如果你有稳定 RPC，再补：</p>
+        <pre><code>POLY_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/你的KEY</code></pre>
+        <p>如果你看到旧 API 三件套：</p>
+        <pre><code>POLY_API_KEY=...
+POLY_API_SECRET=...
+POLY_PASSPHRASE=...</code></pre>
+        <p>建议改成注释：</p>
+        <pre><code># POLY_API_KEY=
+# POLY_API_SECRET=
+# POLY_PASSPHRASE=</code></pre>
+        <div class="note">
+          <strong>不会用 nano 也没关系：</strong><br />
+          方向键移动光标，<code>Ctrl + O</code> 保存，回车确认，<code>Ctrl + X</code> 退出。
+        </div>
+        <div class="warn">
+          同一个变量不要写两遍。如果文件里已经有 <code>POLY_CLOB_HOST</code>，就修改那一行，不要再复制一份新的。
+        </div>
+      </section>
+
+      <section class="card" id="step3">
+        <h2>第 3 步：从 Mac 本地上传“最小升级文件”</h2>
+        <p>这一步在 Mac 本地终端执行，不是在服务器上执行。</p>
+        <p>本地项目目录：</p>
+        <pre><code>/Users/kennywen/Documents/Playground/polymarketbot</code></pre>
+        <p>建议先上传这 6 个文件：</p>
+        <pre><code>scp /Users/kennywen/Documents/Playground/polymarketbot/scripts/executor.py \
+root@你的服务器IP:/root/poly-scan/scripts/executor.py
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/ecosystem.config.js \
+root@你的服务器IP:/root/poly-scan/ecosystem.config.js
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/scripts/recover_positions.py \
+root@你的服务器IP:/root/poly-scan/scripts/recover_positions.py
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/scripts/ctf_redeem.py \
+root@你的服务器IP:/root/poly-scan/scripts/ctf_redeem.py
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/scripts/claim_rewards.py \
+root@你的服务器IP:/root/poly-scan/scripts/claim_rewards.py
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/scripts/wrap_pusd.py \
+root@你的服务器IP:/root/poly-scan/scripts/wrap_pusd.py</code></pre>
+        <div class="danger">
+          这次不要上传以下文件：<br />
+          <code>internal/btc/risk_manager.go</code><br />
+          <code>internal/btc/strategy.go</code><br />
+          <code>.env</code>
+        </div>
+      </section>
+
+      <section class="card" id="step4">
+        <h2>第 4 步：如果你还想一起升级 RTDS / API / Dashboard</h2>
+        <p>如果你要同步 2026-04-24 已验证修复，建议一起上传下面这些文件。</p>
+        <pre><code>scp /Users/kennywen/Documents/Playground/polymarketbot/cmd/api/main.go \
+root@你的服务器IP:/root/poly-scan/cmd/api/main.go
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/cmd/api/main_test.go \
+root@你的服务器IP:/root/poly-scan/cmd/api/main_test.go
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/internal/btc/chainlink_monitor.go \
+root@你的服务器IP:/root/poly-scan/internal/btc/chainlink_monitor.go
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/internal/btc/predictor.go \
+root@你的服务器IP:/root/poly-scan/internal/btc/predictor.go
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/internal/polymarket/api.go \
+root@你的服务器IP:/root/poly-scan/internal/polymarket/api.go
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/App.tsx \
+root@你的服务器IP:/root/poly-scan/dashboard/src/App.tsx
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/api.ts \
+root@你的服务器IP:/root/poly-scan/dashboard/src/api.ts
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/pages/PnlHistory.tsx \
+root@你的服务器IP:/root/poly-scan/dashboard/src/pages/PnlHistory.tsx
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/pages/Portfolio.tsx \
+root@你的服务器IP:/root/poly-scan/dashboard/src/pages/Portfolio.tsx
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/pages/Positions.tsx \
+root@你的服务器IP:/root/poly-scan/dashboard/src/pages/Positions.tsx
+
+scp /Users/kennywen/Documents/Playground/polymarketbot/dashboard/src/pages/Settings.tsx \
+root@你的服务器IP:/root/poly-scan/dashboard/src/pages/Settings.tsx</code></pre>
+        <p>如果你已经直接上传了构建好的 <code>dashboard/dist</code>，可以只重启 <code>poly-dashboard</code>；否则服务器上执行 <code>npm run build</code>。</p>
+      </section>
+
+      <section class="card" id="step5">
+        <h2>第 5 步：回到服务器，检查文件是否真的到了</h2>
+        <pre><code>cd /root/poly-scan
+ls -l scripts/executor.py
+ls -l ecosystem.config.js
+ls -l scripts/recover_positions.py
+ls -l scripts/ctf_redeem.py
+ls -l scripts/claim_rewards.py
+ls -l scripts/wrap_pusd.py</code></pre>
+        <p>如果你还更新了 API / Dashboard，再执行：</p>
+        <pre><code>ls -l cmd/api/main.go
+ls -l dashboard/src/App.tsx
+ls -l dashboard/src/pages/Positions.tsx
+ls -l dashboard/src/pages/Settings.tsx
+ls -l dashboard/src/types.ts</code></pre>
+        <p>如果 <code>ls -l</code> 能显示文件大小和时间，说明文件已经上传成功。</p>
+      </section>
+
+      <section class="card" id="step6">
+        <h2>第 6 步：安装 V2 Python 依赖</h2>
+        <pre><code>cd /root/poly-scan
+python3 --version
+python3 -m pip install --upgrade pip
+python3 -m pip uninstall -y py-clob-client
+python3 -m pip install py-clob-client-v2 requests web3 eth-account eth-abi</code></pre>
+        <p>然后做一次导入检查：</p>
+        <pre><code>python3 - &lt;&lt;'PY'
+from py_clob_client_v2 import ClobClient
+print("py-clob-client-v2 import ok")
+PY</code></pre>
+        <div class="warn">
+          <code>py-clob-client-v2</code> 需要 Python <code>3.9.10+</code>。如果服务器 Python 太旧，必须先升级 Python。
+        </div>
+      </section>
+
+      <section class="card" id="step7">
+        <h2>第 7 步：先判断你是不是 Safe / Proxy 路线</h2>
+        <pre><code>cd /root/poly-scan
+grep -n '^POLY_SIGNATURE_TYPE=' .env
+grep -n '^POLY_FUNDER_ADDRESS=' .env</code></pre>
+        <p>你通常会看到以下之一：</p>
+        <ul>
+          <li><code>POLY_SIGNATURE_TYPE=0</code>：更接近普通 EOA 钱包模式</li>
+          <li><code>POLY_SIGNATURE_TYPE=2</code>：通常是 Proxy / Safe / funder 模式</li>
+        </ul>
+      </section>
+
+      <section class="card" id="step8">
+        <h2>第 8 步：准备 pUSD</h2>
+        <p>V2 下单最关键的一点是：抵押物是 <code>pUSD</code>，不是只有 <code>USDC.e</code> 就够。</p>
+        <p>先看余额：</p>
+        <pre><code>cd /root/poly-scan
+set -a
+source .env
+set +a
+
+python3 scripts/wrap_pusd.py balances</code></pre>
+        <h3>如果你是普通 EOA</h3>
+        <pre><code>python3 scripts/wrap_pusd.py wrap 100
+python3 scripts/wrap_pusd.py balances</code></pre>
+        <h3>如果你是 <code>POLY_SIGNATURE_TYPE=2</code></h3>
+        <div class="warn">
+          更稳的做法不是在服务器上直接执行 <code>wrap_pusd.py</code>，而是用真正出资的钱包登录 Polymarket 前端，在前端把资金准备成 <code>pUSD</code>，然后确认 <code>POLY_FUNDER_ADDRESS</code> 对应的钱包里已经有 <code>pUSD</code>。
+        </div>
+      </section>
+
+      <section class="card" id="step9">
+        <h2>第 9 步：先做一次最关键的连通性测试</h2>
+        <pre><code>cd /root/poly-scan
+set -a
+source .env
+set +a
+
+echo '{"action":"check_collateral_balance"}' | python3 scripts/executor.py</code></pre>
+        <p>理想结果类似：</p>
+        <pre><code>{"success": true, "balance": 123.45}</code></pre>
+        <p>常见报错含义：</p>
+        <ul>
+          <li><code>ModuleNotFoundError: py_clob_client_v2</code>：新 SDK 没装好</li>
+          <li><code>Failed to create or derive API key</code>：私钥 / 签名类型 / funder 地址 / 旧 API 三件套有问题</li>
+          <li><code>insufficient collateral</code>：已经连上了，但 <code>pUSD</code> 不够</li>
+          <li><code>Failed to get pUSD balance</code>：RPC 或资金状态有问题</li>
+        </ul>
+        <div class="danger">
+          如果这一步失败，不要直接重启机器人。先把连通性问题解决掉。
+        </div>
+      </section>
+
+      <section class="card" id="step10">
+        <h2>第 10 步：你到底要不要重新编译</h2>
+        <h3>情况 A：只更新 Python 执行层</h3>
+        <p>如果你只更新了 <code>scripts/*.py</code> 和 <code>ecosystem.config.js</code>，那么 <code>poly-bot</code> 二进制一般可以先不重编。</p>
+        <h3>情况 B：还更新了 <code>cmd/api/main.go</code></h3>
+        <pre><code>cd /root/poly-scan
+go build -o poly-bot-api ./cmd/api/main.go</code></pre>
+        <h3>情况 C：还更新了 dashboard 文件</h3>
+        <pre><code>cd /root/poly-scan/dashboard
+npm install
+npm run build</code></pre>
+      </section>
+
+      <section class="card" id="step11">
+        <h2>第 11 步：如何正确重启 PM2</h2>
+        <p>这次升级有新环境变量，所以最好让 PM2 重新从新版 <code>ecosystem.config.js</code> 加载。</p>
+        <pre><code>cd /root/poly-scan
+pm2 restart ecosystem.config.js --only poly-bot-btc --update-env</code></pre>
+        <p>如果你还升级了 API / Dashboard，再分别执行：</p>
+        <pre><code>pm2 restart ecosystem.config.js --only poly-bot-api --update-env
+pm2 restart ecosystem.config.js --only poly-dashboard --update-env
+pm2 save</code></pre>
+      </section>
+
+      <section class="card" id="step12">
+        <h2>第 12 步：看日志</h2>
+        <pre><code>pm2 logs poly-bot-btc --lines 100
+pm2 logs poly-bot-api --lines 100
+pm2 logs poly-dashboard --lines 100</code></pre>
+        <p>重点看这些错误：</p>
+        <ul>
+          <li><code>ModuleNotFoundError: py_clob_client_v2</code></li>
+          <li><code>Failed to create or derive API key</code></li>
+          <li><code>Failed to get pUSD balance</code></li>
+          <li><code>insufficient collateral</code></li>
+          <li><code>py-clob-client-v2 requires Python 3.9.10+</code></li>
+        </ul>
+      </section>
+
+      <section class="card" id="step13">
+        <h2>第 13 步：如果你现在就想跑 V2</h2>
+        <p>现在就可以提前跑 V2，但你要满足这 4 条：</p>
+        <ol>
+          <li><code>.env</code> 里有 <code>POLY_CLOB_HOST=https://clob-v2.polymarket.com</code></li>
+          <li><code>scripts/executor.py</code> 已经是新版</li>
+          <li><code>py-clob-client-v2</code> 已装好</li>
+          <li>你的真实出资地址里已经有 <code>pUSD</code></li>
+        </ol>
+        <div class="note">
+          提前切到 V2 可以避免以后再做一次代码迁移，但不代表 <code>2026-04-28 19:00</code> 北京时间当天就完全不用管了。那天你仍然要关注官方停机窗口、挂单清空，以及 <code>POLY_CLOB_HOST</code> 从 <code>clob-v2</code> 切回正式入口。
+        </div>
+      </section>
+
+      <section class="card" id="step14">
+        <h2>第 14 步：到 2026-04-28 19:00 北京时间当天，你要做什么</h2>
+        <p>如果你在切换前已经写了：</p>
+        <pre><code>POLY_CLOB_HOST=https://clob-v2.polymarket.com</code></pre>
+        <p>那么当天按这个顺序做：</p>
+        <ol>
+          <li>先停机器人：<code>pm2 stop poly-bot-btc</code></li>
+          <li>等官方停机窗口结束</li>
+          <li>打开 <code>.env</code>：<code>nano /root/poly-scan/.env</code></li>
+          <li>把 <code>POLY_CLOB_HOST=https://clob-v2.polymarket.com</code> 删除，或者改成 <code>https://clob.polymarket.com</code></li>
+          <li>保存退出：<code>Ctrl + O</code>、回车、<code>Ctrl + X</code></li>
+          <li>重启：<code>pm2 restart ecosystem.config.js --only poly-bot-btc --update-env</code></li>
+        </ol>
+        <p>如果你还有 API / Dashboard，再分别重启对应进程。</p>
+      </section>
+
+      <section class="card" id="rollback">
+        <h2>如果升级失败，怎么快速回滚</h2>
+        <p>先停进程：</p>
+        <pre><code>pm2 stop poly-bot-btc
+pm2 stop poly-bot-api
+pm2 stop poly-dashboard</code></pre>
+        <p>回到项目上级目录：</p>
+        <pre><code>cd /root</code></pre>
+        <p>把当前目录先改名：</p>
+        <pre><code>mv poly-scan poly-scan.failed-$(date +%F-%H%M%S)</code></pre>
+        <p>把备份恢复回来。注意把时间戳替换成你自己的备份名：</p>
+        <pre><code>cp -a poly-scan.backup-2026-04-22-120000 poly-scan
+cp /root/poly-scan/.env.backup-2026-04-22-120000 /root/poly-scan/.env</code></pre>
+        <p>最后重新启动原服务：</p>
+        <pre><code>cd /root/poly-scan
+pm2 restart ecosystem.config.js --only poly-bot-btc --update-env
+pm2 restart ecosystem.config.js --only poly-bot-api --update-env
+pm2 restart ecosystem.config.js --only poly-dashboard --update-env
+pm2 save</code></pre>
+      </section>
+
+      <section class="card" id="pitfalls">
+        <h2>最常见的坑</h2>
+        <ol>
+          <li>把服务器上的 <code>.env</code> 覆盖掉了。</li>
+          <li>把自己的策略文件也传上去了。</li>
+          <li><code>.env</code> 里写了两行 <code>POLY_CLOB_HOST</code>。</li>
+          <li>改了 <code>.env</code>，却没更新 <code>ecosystem.config.js</code>。</li>
+          <li>改完后没有用 <code>pm2 restart ... --update-env</code>。</li>
+          <li>只有 <code>USDC.e</code>，却以为已经能在 V2 下单。</li>
+          <li>在 <code>POLY_SIGNATURE_TYPE=2</code> 模式下直接乱跑 <code>wrap_pusd.py</code>。</li>
+          <li>还没做 <code>check_collateral_balance</code> 就直接重启机器人。</li>
+          <li>服务器 Python 版本太低。</li>
+          <li>切换当天忘了官方会清空挂单。</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>最稳的执行顺序</h2>
+        <ol>
+          <li>确认服务器真实路径。</li>
+          <li>备份整个项目和 <code>.env</code>。</li>
+          <li>只手动补 <code>POLY_CLOB_HOST</code>，可选补 <code>POLY_RPC_URL</code>。</li>
+          <li>不要改私钥、签名类型、funder 地址。</li>
+          <li>从 Mac 只上传最小升级文件。</li>
+          <li>不要上传 <code>internal/btc/*</code>。</li>
+          <li>安装 <code>py-clob-client-v2</code>。</li>
+          <li>准备好 <code>pUSD</code>。</li>
+          <li>先做 <code>check_collateral_balance</code>。</li>
+          <li>成功后再重启 <code>poly-bot-btc</code>。</li>
+          <li>看日志确认没有报错。</li>
+          <li>到 <code>2026-04-28 19:00</code> 北京时间，再把 <code>POLY_CLOB_HOST</code> 切回正式入口。</li>
+        </ol>
+      </section>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PolymarketBot 修改记录</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #15202b; background: #f4f6f8; }
+    main { max-width: 980px; margin: 0 auto; padding: 36px 18px 64px; }
+    section { background: #fff; border: 1px solid #d7dee7; border-radius: 22px; padding: 26px; margin: 16px 0; box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06); }
+    h1 { font-size: 34px; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin-top: 0; }
+    code { background: #edf2f7; border-radius: 6px; padding: 2px 6px; }
+    li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>PolymarketBot 修改记录</h1>
+  </section>
+  <section>
+    <h2>2026-04-24</h2>
+    <ul>
+      <li>统一正式项目目录为 <code>/Users/kennywen/Documents/Playground/polymarketbot</code>。</li>
+      <li>修复 ChainlinkMonitor 连接 Polymarket RTDS：当前订阅协议、PING 保活、持续重连。</li>
+      <li>修复 Dashboard pUSD 余额显示：优先 CLOB collateral，增加超时、缓存和 fallback。</li>
+      <li>修复历史页空白/无限加载：无交易时返回并兼容 <code>[]</code>。</li>
+      <li>修复页面被慢接口拖死：前端请求 12 秒超时，页面主体不依赖账户接口完成。</li>
+      <li>修复左下角 WebSocket 状态误报离线：首页订阅全局连接。</li>
+      <li>新增需求文档、开发文档、修改记录及对应 HTML。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>2026-04-23</h2>
+    <ul>
+      <li>服务器验证 pUSD 余额显示为 <code>$64.98</code>。</li>
+      <li>服务器验证 RTDS 日志出现连接成功和价格 established。</li>
+      <li>服务器验证 Dashboard 所有页面可打开。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

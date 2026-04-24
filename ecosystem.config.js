@@ -39,9 +39,13 @@ module.exports = {
         POLY_PRIVATE_KEY: dotenv.POLY_PRIVATE_KEY || '',
         POLY_SIGNATURE_TYPE: dotenv.POLY_SIGNATURE_TYPE || '2',
         POLY_FUNDER_ADDRESS: dotenv.POLY_FUNDER_ADDRESS || '',
+        POLY_CLOB_HOST: dotenv.POLY_CLOB_HOST || '',
+        POLY_BUILDER_CODE: dotenv.POLY_BUILDER_CODE || '',
+        POLY_RPC_URL: dotenv.POLY_RPC_URL || '',
         POLY_TAKE_PROFIT_PCT: dotenv.POLY_TAKE_PROFIT_PCT || '0.50',
         POLY_STOP_LOSS_PCT: dotenv.POLY_STOP_LOSS_PCT || '0.30',
         POLY_SIMULATION: dotenv.POLY_SIMULATION || '0', // Simulation mode: set to '0' for live trading
+        POLY_REQUIRE_CHAINLINK_RTDS: dotenv.POLY_REQUIRE_CHAINLINK_RTDS || '0',
         POLY_RELAYER_API_KEY: dotenv.POLY_RELAYER_API_KEY || '',
         // CRITICAL: Do NOT set API_KEY/SECRET/PASSPHRASE — let Python derive fresh ones
         POLY_API_KEY: '',
@@ -64,6 +68,20 @@ module.exports = {
       max_restarts: 10,
       env: {
         API_PORT: 9876,
+        API_BIND_HOST: dotenv.API_BIND_HOST || '0.0.0.0',
+        POLY_PRIVATE_KEY: dotenv.POLY_PRIVATE_KEY || '',
+        POLY_SIGNATURE_TYPE: dotenv.POLY_SIGNATURE_TYPE || '2',
+        POLY_FUNDER_ADDRESS: dotenv.POLY_FUNDER_ADDRESS || '',
+        POLY_ADDRESS: dotenv.POLY_ADDRESS || '',
+        POLY_CLOB_HOST: dotenv.POLY_CLOB_HOST || '',
+        POLY_BUILDER_CODE: dotenv.POLY_BUILDER_CODE || '',
+        POLY_RPC_URL: dotenv.POLY_RPC_URL || '',
+        POLYGON_RPC_URL: dotenv.POLYGON_RPC_URL || '',
+        POLY_DASHBOARD_FETCH_GENERIC_MARKETS: dotenv.POLY_DASHBOARD_FETCH_GENERIC_MARKETS || '0',
+        // CRITICAL: Do NOT set API_KEY/SECRET/PASSPHRASE — let Python derive fresh ones
+        POLY_API_KEY: '',
+        POLY_API_SECRET: '',
+        POLY_PASSPHRASE: '',
       },
       error_file: '/root/poly-scan/logs/api-error.log',
       out_file: '/root/poly-scan/logs/api-out.log',
@@ -74,7 +92,7 @@ module.exports = {
     {
       name: 'poly-dashboard',
       script: 'npx',
-      args: 'serve dist -l tcp://127.0.0.1:3457 -s',
+      args: 'serve dist -l tcp://0.0.0.0:3457 -s',
       cwd: '/root/poly-scan/dashboard',
       watch: false,
       autorestart: true,

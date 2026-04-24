@@ -47,14 +47,14 @@ type RiskConfig struct {
 // DefaultRiskConfig returns default risk configuration
 func DefaultRiskConfig() RiskConfig {
 	return RiskConfig{
-		MaxDailyLoss:       100.0,
-		MaxDrawdownPct:     0.20,
-		MaxConsecutiveLoss: 3,
-		CooldownAfterLoss:  5 * time.Minute,
-		MaxDailyTrades:     20,
-		MinConfidenceFloor: 0.52, // Match predictor threshold (GTC maker orders are fee-free)
-		RiskPerTrade:       0.05,
-		MaxPositionUSD:     15.0,
+		MaxDailyLoss:       6.0,              // 50 USDC 本金先把单日最大亏损压小
+		MaxDrawdownPct:     0.15,
+		MaxConsecutiveLoss: 2,
+		CooldownAfterLoss:  15 * time.Minute,
+		MaxDailyTrades:     6,
+		MinConfidenceFloor: 0.60,
+		RiskPerTrade:       0.01,             // 先按 1% 风险测试
+		MaxPositionUSD:     3.0,
 	}
 }
 
@@ -155,27 +155,14 @@ func (rm *RiskManager) CalculatePositionSize(confidence, currentPrice, balance f
 
 	kellyFraction := (p*b - q) / b
 	if kellyFraction <= 0 {
-		return 5 // Minimum shares — Kelly says don't bet but allow minor positions
+		return 1 // 保守复测版：即使 Kelly 不支持，也不再强制放大到 5 shares
 	}
 
 	// Fractional Kelly (50%) to reduce variance
 	kellyFraction *= 0.5
 
-	// Tiered risk allocation — cheap tokens have extreme risk/reward,
-	// so we allocate more capital when price is very low.
-	// Trade analysis: <$0.10 = 100% win rate, $0.10-0.20 = 50%, $0.20-0.35 = 45%
 	effectiveRiskPerTrade := rm.config.RiskPerTrade
 	maxPosition := rm.config.MaxPositionUSD
-	switch {
-	case currentPrice < 0.05:
-		effectiveRiskPerTrade = 0.25 // 25% of balance for ultra-cheap tokens
-		maxPosition = rm.config.MaxPositionUSD * 1.5
-	case currentPrice < 0.10:
-		effectiveRiskPerTrade = 0.15 // 15% for very cheap tokens
-		maxPosition = rm.config.MaxPositionUSD * 1.2
-	case currentPrice < 0.20:
-		effectiveRiskPerTrade = 0.10 // 10% for cheap tokens
-	}
 
 	// Cap Kelly fraction at effective risk-per-trade limit
 	if kellyFraction > effectiveRiskPerTrade {
@@ -192,9 +179,9 @@ func (rm *RiskManager) CalculatePositionSize(confidence, currentPrice, balance f
 	// Convert to shares
 	shares := positionUSD / currentPrice
 
-	// Ensure minimum of 5 shares for Polymarket
-	if shares < 5 {
-		shares = 5
+	// 保守复测版：不强制抬到 5 shares
+	if shares < 1 {
+		shares = 1
 	}
 
 	// Cap maximum shares based on USD value

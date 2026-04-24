@@ -57,28 +57,33 @@ type BTCMarketConfig struct {
 // - Low odds entry (token price <= 0.35)
 func DefaultBTCMarketConfig() BTCMarketConfig {
 	return BTCMarketConfig{
-		WindowDuration:         5 * time.Minute,
-		PredictBeforeEnd:       120 * time.Second, // Extended: catch price moves before market adjusts (oracle-lag)
-		MinConfidence:          0.52,             // 52% threshold (GTC maker orders are fee-free, EV+ at 52%)
-		MaxPositionSize:        15.0,
-		MinPriceChangePct:      0.01,             // 0.01% threshold (~$7 for BTC; confidence filters noise)
-		ExecutionLeadTime:      15 * time.Second, // Reduced from 20s for faster execution
-		CooldownPerMarket:      1 * time.Minute,
-		UseDynamicPricing:      true,
-		PriceSlippage:          0.03,
-		EnableRiskMgmt:         true,
-		EnableExitStrategy:     true,
-		ExitBeforeEnd:          8 * time.Second,
+		WindowDuration:      5 * time.Minute,
+		PredictBeforeEnd:    60 * time.Second,
+		MinConfidence:       0.60,
+		MaxPositionSize:     3.0,  // 50 USDC 本金时，单笔先压到 3 USDC
+		MinPriceChangePct:   0.07,
+		ExecutionLeadTime:   10 * time.Second,
+		CooldownPerMarket:   2 * time.Minute,
+
+		UseDynamicPricing:   true,
+		PriceSlippage:       0.015, // 从 3% 收紧到 1.5%
+
+		EnableRiskMgmt:      true,
+
+		EnableExitStrategy:  false, // 先关掉退出策略，纯看方向判断
+		ExitBeforeEnd:       0,
 		TrendReversalThreshold: 0.3,
-		TakeProfitPct:          0.50, // Take profit at 50% gain
-		StopLossPct:            0.30, // Stop loss at 30% decline (tiered: wider for cheap tokens)
-		TradingTimezone:        "Asia/Shanghai",
-		BoostHoursStart:        6,    // UTC+8 06:00 — historically most profitable
-		BoostHoursEnd:          9,    // UTC+8 09:00
-		QuietHoursStart:        18,   // UTC+8 18:00 — historically net negative
-		QuietHoursEnd:          22,   // UTC+8 22:00
-		QuietSizeMultiplier:    0.5,  // Half position during quiet hours
-		BoostSizeMultiplier:    1.5,  // 50% more during boost hours
+		TakeProfitPct:       0.50,
+		StopLossPct:         0.30,
+
+		TradingTimezone:     "Asia/Shanghai",
+
+		BoostHoursStart:     6,
+		BoostHoursEnd:       9,
+		QuietHoursStart:     -1,   // 禁用 quiet hours
+		QuietHoursEnd:       -1,
+		QuietSizeMultiplier: 1.0,  // 不做时段缩放
+		BoostSizeMultiplier: 1.0,  // 不做时段放大
 	}
 }
 

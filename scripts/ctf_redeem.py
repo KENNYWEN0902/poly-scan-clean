@@ -10,7 +10,7 @@ from eth_account import Account
 
 # CTF Contract on Polygon
 CTF_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
-USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"  # USDC.e on Polygon
+PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"  # pUSD on Polygon
 HASH_ZERO = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 # CTF ABI (simplified - only redeemPositions)
@@ -51,7 +51,7 @@ def redeem_position(condition_id: str, private_key: str, rpc_url: str = "https:/
     
     # Build transaction
     txn = ctf.functions.redeemPositions(
-        USDC_ADDRESS,
+        PUSD_ADDRESS,
         HASH_ZERO,
         condition_id,
         [1, 2]  # Redeem both outcomes (only winning pays)

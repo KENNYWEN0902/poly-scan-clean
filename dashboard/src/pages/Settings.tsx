@@ -23,16 +23,25 @@ export default function SettingsPage() {
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     Promise.all([
       api.getConfig().catch(() => null),
-      api.getAccount().catch(() => null),
       api.getTradingStopped().catch(() => false),
-    ]).then(([c, a, stopped]) => {
+    ]).then(([c, stopped]) => {
+      if (cancelled) return;
       if (c) setConfig(c);
-      if (a) setAccount(a);
       setTradingStopped(stopped);
       setLoading(false);
     });
+
+    api.getAccount().then(a => {
+      if (!cancelled && a) setAccount(a);
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleToggleTrading = useCallback(async () => {
@@ -61,10 +70,14 @@ export default function SettingsPage() {
     setConfig({ ...config, [key]: value });
   };
 
+  const collateralBalance =
+    account?.collateral_balance ?? account?.pusd_balance ?? account?.usdc_balance ?? 0;
+  const collateralSymbol = account?.collateral_symbol || 'pUSD';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400 text-sm font-medium">Loading settings...</div>
+        <div className="text-slate-400 text-sm font-medium">正在加载设置...</div>
       </div>
     );
   }
@@ -73,8 +86,8 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Settings</h1>
-          <p className="text-sm text-slate-400 font-medium mt-1">Configure strategy and risk parameters</p>
+          <h1 className="text-2xl font-black text-slate-900">设置</h1>
+          <p className="text-sm text-slate-400 font-medium mt-1">配置策略与风控参数</p>
         </div>
         <button
           onClick={handleSave}
@@ -85,7 +98,7 @@ export default function SettingsPage() {
               : 'bg-primary text-white hover:bg-primary-container shadow-lg shadow-primary/20'
           } disabled:opacity-50`}
         >
-          {saved ? '✓ Saved' : saving ? 'Saving...' : 'Save Changes'}
+          {saved ? '已保存' : saving ? '保存中...' : '保存修改'}
         </button>
       </div>
 
@@ -95,9 +108,9 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <MIcon name={tradingStopped ? 'pause_circle' : 'play_circle'} filled className={`text-3xl ${tradingStopped ? 'text-red-500' : 'text-secondary'}`} />
             <div>
-              <h2 className="text-xl font-black text-slate-900">Trading Control</h2>
+              <h2 className="text-xl font-black text-slate-900">交易控制</h2>
               <p className="text-sm text-slate-400 font-medium mt-0.5">
-                {tradingStopped ? 'Trading is PAUSED — no new positions will be opened' : 'Bot is actively scanning and trading'}
+                {tradingStopped ? '交易已暂停，系统不会再开新仓' : '机器人正在扫描并交易'}
               </p>
             </div>
           </div>
@@ -110,7 +123,7 @@ export default function SettingsPage() {
                 : 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
             } disabled:opacity-50`}
           >
-            {toggling ? '...' : tradingStopped ? '▶ Resume Trading' : '⏸ Stop Trading'}
+            {toggling ? '...' : tradingStopped ? '▶ 恢复交易' : '⏸ 停止交易'}
           </button>
         </div>
       </div>
@@ -120,12 +133,12 @@ export default function SettingsPage() {
         <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
           <div className="flex items-center gap-3 mb-6">
             <MIcon name="account_circle" filled className="text-primary text-2xl" />
-            <h2 className="text-xl font-black text-slate-900">Account</h2>
+            <h2 className="text-xl font-black text-slate-900">账户</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <InfoItem label="Wallet" value={account.wallet_address ? `${account.wallet_address.slice(0, 6)}...${account.wallet_address.slice(-4)}` : '--'} />
-            <InfoItem label="USDC Balance" value={`$${account.usdc_balance.toFixed(2)}`} />
-            <InfoItem label="Portfolio Value" value={`$${account.portfolio_value.toFixed(2)}`} />
+            <InfoItem label="钱包" value={account.wallet_address ? `${account.wallet_address.slice(0, 6)}...${account.wallet_address.slice(-4)}` : '--'} />
+            <InfoItem label={`${collateralSymbol} 余额`} value={`$${collateralBalance.toFixed(2)}`} />
+            <InfoItem label="组合市值" value={`$${account.portfolio_value.toFixed(2)}`} />
           </div>
         </div>
       )}
@@ -135,17 +148,17 @@ export default function SettingsPage() {
         <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
           <div className="flex items-center gap-3 mb-6">
             <MIcon name="tune" filled className="text-primary text-2xl" />
-            <h2 className="text-xl font-black text-slate-900">Strategy Configuration</h2>
+            <h2 className="text-xl font-black text-slate-900">策略配置</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <NumberField label="Min Confidence" value={config.min_confidence} onChange={v => updateField('min_confidence', v)} step={0.01} min={0} max={1} hint="0-1 scale" />
-            <NumberField label="Min Price Change" value={config.min_price_change} onChange={v => updateField('min_price_change', v)} step={0.0001} min={0} hint="Decimal %" />
-            <NumberField label="Max Position USD" value={config.max_position_usd} onChange={v => updateField('max_position_usd', v)} step={5} min={1} hint="Max $ per trade" />
-            <NumberField label="Predict Before End (s)" value={config.predict_before_end} onChange={v => updateField('predict_before_end', v)} step={1} min={1} hint="Seconds" />
-            <NumberField label="Execution Lead Time (s)" value={config.execution_lead_time} onChange={v => updateField('execution_lead_time', v)} step={1} min={0} hint="Seconds" />
-            <NumberField label="Cooldown Per Market (s)" value={config.cooldown_per_market} onChange={v => updateField('cooldown_per_market', v)} step={1} min={0} hint="Seconds" />
-            <NumberField label="Price Slippage" value={config.price_slippage} onChange={v => updateField('price_slippage', v)} step={0.001} min={0} hint="Decimal" />
-            <ToggleField label="Dynamic Pricing" value={config.use_dynamic_pricing} onChange={v => updateField('use_dynamic_pricing', v)} />
+            <NumberField label="最低置信度" value={config.min_confidence} onChange={v => updateField('min_confidence', v)} step={0.01} min={0} max={1} hint="0-1 范围" />
+            <NumberField label="最小价格变动" value={config.min_price_change} onChange={v => updateField('min_price_change', v)} step={0.0001} min={0} hint="小数百分比" />
+            <NumberField label="单笔最大仓位（USD）" value={config.max_position_usd} onChange={v => updateField('max_position_usd', v)} step={5} min={1} hint="每笔交易最高美元金额" />
+            <NumberField label="提前预测时间（秒）" value={config.predict_before_end} onChange={v => updateField('predict_before_end', v)} step={1} min={1} hint="秒" />
+            <NumberField label="提前执行时间（秒）" value={config.execution_lead_time} onChange={v => updateField('execution_lead_time', v)} step={1} min={0} hint="秒" />
+            <NumberField label="单市场冷却时间（秒）" value={config.cooldown_per_market} onChange={v => updateField('cooldown_per_market', v)} step={1} min={0} hint="秒" />
+            <NumberField label="价格滑点" value={config.price_slippage} onChange={v => updateField('price_slippage', v)} step={0.001} min={0} hint="小数" />
+            <ToggleField label="动态定价" value={config.use_dynamic_pricing} onChange={v => updateField('use_dynamic_pricing', v)} />
           </div>
         </div>
       )}
@@ -155,14 +168,14 @@ export default function SettingsPage() {
         <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] neo-shadow border border-white/50">
           <div className="flex items-center gap-3 mb-6">
             <MIcon name="shield" filled className="text-primary text-2xl" />
-            <h2 className="text-xl font-black text-slate-900">Risk Management</h2>
+            <h2 className="text-xl font-black text-slate-900">风险管理</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ToggleField label="Enable Risk Management" value={config.enable_risk_mgmt} onChange={v => updateField('enable_risk_mgmt', v)} />
-            <NumberField label="Max Daily Loss" value={config.max_daily_loss} onChange={v => updateField('max_daily_loss', v)} step={10} min={0} hint="USD" />
-            <NumberField label="Max Drawdown %" value={config.max_drawdown_pct} onChange={v => updateField('max_drawdown_pct', v)} step={0.01} min={0} max={1} hint="0-1 scale" />
-            <NumberField label="Max Consecutive Loss" value={config.max_consecutive_loss} onChange={v => updateField('max_consecutive_loss', v)} step={1} min={1} hint="Trades" />
-            <NumberField label="Max Daily Trades" value={config.max_daily_trades} onChange={v => updateField('max_daily_trades', v)} step={1} min={1} hint="Count" />
+            <ToggleField label="启用风险管理" value={config.enable_risk_mgmt} onChange={v => updateField('enable_risk_mgmt', v)} />
+            <NumberField label="单日最大亏损" value={config.max_daily_loss} onChange={v => updateField('max_daily_loss', v)} step={10} min={0} hint="美元" />
+            <NumberField label="最大回撤 %" value={config.max_drawdown_pct} onChange={v => updateField('max_drawdown_pct', v)} step={0.01} min={0} max={1} hint="0-1 范围" />
+            <NumberField label="最大连续亏损" value={config.max_consecutive_loss} onChange={v => updateField('max_consecutive_loss', v)} step={1} min={1} hint="笔数" />
+            <NumberField label="单日最大交易数" value={config.max_daily_trades} onChange={v => updateField('max_daily_trades', v)} step={1} min={1} hint="笔数" />
           </div>
         </div>
       )}

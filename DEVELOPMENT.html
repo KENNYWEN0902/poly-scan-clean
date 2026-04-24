@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PolymarketBot 开发文档</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #172033; background: #f6f4ef; }
+    main { max-width: 980px; margin: 0 auto; padding: 36px 18px 64px; }
+    section { background: #fffdfa; border: 1px solid #e4d8c8; border-radius: 22px; padding: 26px; margin: 16px 0; box-shadow: 0 18px 45px rgba(62, 46, 25, 0.07); }
+    h1 { font-size: 34px; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin-top: 0; }
+    code { background: #f0ece4; border-radius: 6px; padding: 2px 6px; }
+    pre { background: #111827; color: #e5e7eb; border-radius: 14px; padding: 14px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e4d8c8; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>PolymarketBot 开发文档</h1>
+    <p>更新时间：2026-04-24</p>
+    <p>唯一维护目录：<code>/Users/kennywen/Documents/Playground/polymarketbot</code></p>
+  </section>
+  <section>
+    <h2>核心模块</h2>
+    <table>
+      <tr><th>模块</th><th>文件</th><th>说明</th></tr>
+      <tr><td>API 服务</td><td><code>cmd/api/main.go</code></td><td>REST、WebSocket、账户余额、历史交易</td></tr>
+      <tr><td>Chainlink RTDS</td><td><code>internal/btc/chainlink_monitor.go</code></td><td>订阅、PING、重连、fallback</td></tr>
+      <tr><td>Dashboard API 客户端</td><td><code>dashboard/src/api.ts</code></td><td>请求超时、WebSocket、订阅机制</td></tr>
+      <tr><td>Dashboard Shell</td><td><code>dashboard/src/App.tsx</code></td><td>账户轮询、全局在线状态</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>构建与重启</h2>
+    <pre><code>cd /root/poly-scan
+gofmt -w cmd/api/main.go internal/btc/chainlink_monitor.go internal/btc/predictor.go internal/polymarket/api.go
+go build -o poly-bot-api ./cmd/api
+go build -o poly-bot ./cmd/main.go
+
+cd /root/poly-scan/dashboard
+npm install
+npm run build
+
+cd /root/poly-scan
+pm2 restart poly-bot-api --update-env
+pm2 restart poly-bot-btc --update-env
+pm2 restart poly-dashboard --update-env</code></pre>
+  </section>
+  <section>
+    <h2>同步原则</h2>
+    <ul>
+      <li>不上传 <code>.env</code>、<code>.git</code>、<code>node_modules</code>、<code>.DS_Store</code>。</li>
+      <li>不覆盖服务器 <code>data/</code> 和 <code>logs/</code>。</li>
+      <li>修改 PM2 配置后重启必须加 <code>--update-env</code>。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

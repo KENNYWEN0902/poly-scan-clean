@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Polymarket Order Executor
-Executes orders via py-clob-client with batch support and error handling.
+Executes orders via py-clob-client-v2 with batch support and error handling.
 """
 
 import sys
@@ -13,19 +13,25 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import (
-    OrderArgs,
-    OrderType,
+from py_clob_client_v2 import (
+    AssetType,
     ApiCreds,
     BalanceAllowanceParams,
-    AssetType,
+    BuilderConfig,
+    ClobClient,
+    OrderArgs,
+    OrderType,
 )
 
 # Rate limiting configuration
 MIN_REQUEST_INTERVAL = 0.5  # Minimum seconds between API requests
 MAX_RETRIES = 3  # Maximum retry attempts for 429 errors
 BASE_RETRY_DELAY = 2.0  # Base delay for exponential backoff
+
+MIN_PYTHON = (3, 9, 10)
+DEFAULT_CLOB_HOST = "https://clob.polymarket.com"
+PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
+CTF_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
 
 
 class OrderStatus(Enum):
@@ -60,22 +66,35 @@ class BatchResult:
 
 
 class PolymarketExecutor:
-    def __init__(self, host: str = "https://clob.polymarket.com", chain_id: int = 137):
-        self.host = host
+    def __init__(self, host: Optional[str] = None, chain_id: int = 137):
+        self.host = (host or os.environ.get("POLY_CLOB_HOST") or DEFAULT_CLOB_HOST).rstrip("/")
         self.chain_id = chain_id
         self.client: Optional[ClobClient] = None
+        self.connect_error = ""
 
     def connect(self) -> bool:
+        if sys.version_info < MIN_PYTHON:
+            version = ".".join(str(part) for part in MIN_PYTHON)
+            self.connect_error = (
+                f"py-clob-client-v2 requires Python {version}+ "
+                f"(current: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro})"
+            )
+            print(f"Error: {self.connect_error}", file=sys.stderr)
+            return False
+
         private_key = os.environ.get("POLY_PRIVATE_KEY")
         try:
             signature_type = int(os.environ.get("POLY_SIGNATURE_TYPE", "0"))
         except ValueError:
+            self.connect_error = "POLY_SIGNATURE_TYPE must be an int"
             print("Error: POLY_SIGNATURE_TYPE must be an int", file=sys.stderr)
             return False
 
         funder_address = os.environ.get("POLY_FUNDER_ADDRESS", "")
+        builder_code = os.environ.get("POLY_BUILDER_CODE", "").strip()
 
         if not private_key:
+            self.connect_error = "POLY_PRIVATE_KEY is required"
             print("Error: POLY_PRIVATE_KEY is required.", file=sys.stderr)
             return False
 
@@ -88,6 +107,8 @@ class PolymarketExecutor:
 
         if signature_type in [1, 2] and funder_address:
             client_kwargs["funder"] = funder_address
+        if builder_code:
+            client_kwargs["builder_config"] = BuilderConfig(builder_code=builder_code)
         self.client = ClobClient(**client_kwargs)
 
         # Use pre-configured API creds from env if available (faster, no on-chain call)
@@ -101,35 +122,27 @@ class PolymarketExecutor:
                 api_secret=api_secret,
                 api_passphrase=passphrase,
             ))
-            print("[DEBUG] Using pre-configured API creds from env.", file=sys.stderr)
+            print(
+                f"[DEBUG] Using pre-configured API creds from env against {self.host}.",
+                file=sys.stderr,
+            )
             return True
 
-        # Fallback: derive or create API key from private key
-        # Step 1: Try derive (retrieves existing key)
+        # V2 keeps the same L1/L2 auth flow; the new SDK exposes a combined helper.
         try:
-            derived = self.client.derive_api_key()
-            if derived and getattr(derived, 'api_key', None):
-                self.client.set_api_creds(derived)
-                print(f"[DEBUG] Derived API creds successfully.", file=sys.stderr)
+            creds = self.client.create_or_derive_api_key()
+            if creds and getattr(creds, "api_key", None):
+                self.client.set_api_creds(creds)
+                print(f"[DEBUG] Created/derived API creds successfully for {self.host}.", file=sys.stderr)
                 return True
-            else:
-                print("[WARN] derive_api_key returned empty creds, trying create...", file=sys.stderr)
         except Exception as e:
-            print(f"[WARN] derive_api_key failed: {e}, trying create...", file=sys.stderr)
-
-        # Step 2: Create new API key if derive failed
-        try:
-            created = self.client.create_api_key()
-            if created and getattr(created, 'api_key', None):
-                self.client.set_api_creds(created)
-                print(f"[DEBUG] Created new API key successfully.", file=sys.stderr)
-                return True
-            else:
-                print("Error: create_api_key returned empty creds", file=sys.stderr)
-                return False
-        except Exception as e:
-            print(f"Error: Failed to create API key: {e}", file=sys.stderr)
+            self.connect_error = f"Failed to create or derive API key: {e}"
+            print(f"Error: {self.connect_error}", file=sys.stderr)
             return False
+
+        self.connect_error = "create_or_derive_api_key returned empty creds"
+        print(f"Error: {self.connect_error}", file=sys.stderr)
+        return False
 
     def _api_call_with_retry(self, func, *args, **kwargs):
         last_error = None
@@ -289,10 +302,10 @@ class PolymarketExecutor:
                         raw_making = float(making_amount)
                         raw_taking = float(taking_amount)
                         if side == "SELL" and raw_making > 0:
-                            # SELL: makingAmount=tokens, takingAmount=USDC → price = USDC/tokens
+                            # SELL: makingAmount=tokens, takingAmount=collateral → price = collateral/tokens
                             actual_avg_price = raw_taking / raw_making
                         elif raw_taking > 0:
-                            # BUY: makingAmount=USDC, takingAmount=tokens → price = USDC/tokens
+                            # BUY: makingAmount=collateral, takingAmount=tokens → price = collateral/tokens
                             actual_avg_price = raw_making / raw_taking
                         print(f"[DEBUG] Parsed avg price ({side}): making={raw_making}, taking={raw_taking}, price={actual_avg_price}", file=sys.stderr)
                     except (ValueError, TypeError, ZeroDivisionError):
@@ -357,8 +370,8 @@ class PolymarketExecutor:
         all_success = True
         error_messages = []
 
-        # Refresh balance allowance cache (best-effort, not fatal)
-        # This syncs on-chain USDC allowance to CLOB cache
+        # Refresh balance allowance cache (best-effort, not fatal).
+        # This syncs on-chain pUSD allowance to the CLOB cache.
         try:
             self.client.update_balance_allowance(
                 BalanceAllowanceParams(asset_type=AssetType.COLLATERAL)
@@ -467,10 +480,10 @@ class PolymarketExecutor:
                         raw_making = float(making_amount)
                         raw_taking = float(taking_amount)
                         if order["side"] == "SELL" and raw_making > 0:
-                            # SELL: makingAmount=tokens, takingAmount=USDC → price = USDC/tokens
+                            # SELL: makingAmount=tokens, takingAmount=collateral → price = collateral/tokens
                             avg_price = raw_taking / raw_making
                         elif raw_taking > 0:
-                            # BUY: makingAmount=USDC, takingAmount=tokens → price = USDC/tokens
+                            # BUY: makingAmount=collateral, takingAmount=tokens → price = collateral/tokens
                             avg_price = raw_making / raw_taking
                         else:
                             avg_price = float(resp.get("price", str(order["price"])))
@@ -654,8 +667,8 @@ class PolymarketExecutor:
             from eth_account import Account
             from eth_abi import encode as abi_encode
 
-            CTF = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
-            USDC = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+            CTF = CTF_ADDRESS
+            collateral = PUSD_ADDRESS
             custom_rpc = os.environ.get("POLY_RPC_URL", "")
             RPCS = ([custom_rpc] if custom_rpc else []) + [
                 "https://polygon-rpc.com",
@@ -697,7 +710,7 @@ class PolymarketExecutor:
             cid_bytes = bytes.fromhex(cid_hex)
             params = abi_encode(
                 ["address", "bytes32", "bytes32", "uint256[]"],
-                [Web3.to_checksum_address(USDC), b"\x00" * 32, cid_bytes, [1, 2]],
+                [Web3.to_checksum_address(collateral), b"\x00" * 32, cid_bytes, [1, 2]],
             )
             redeem_data = selector + params
 
@@ -790,8 +803,6 @@ class PolymarketExecutor:
 
     def check_balances(self, token_ids: List[str]) -> Dict[str, float]:
         """Check balances for multiple token IDs."""
-        from py_clob_client.clob_types import BalanceAllowanceParams, AssetType
-
         balances = {}
         try:
             signature_type = int(os.environ.get("POLY_SIGNATURE_TYPE", "0"))
@@ -826,10 +837,8 @@ class PolymarketExecutor:
 
         return balances
 
-    def check_usdc_balance(self) -> float:
-        """Check the available USDC balance (collateral)."""
-        from py_clob_client.clob_types import BalanceAllowanceParams, AssetType
-
+    def check_collateral_balance(self) -> float:
+        """Check the available pUSD balance tracked by the CLOB."""
         try:
             signature_type = int(os.environ.get("POLY_SIGNATURE_TYPE", "0"))
         except ValueError:
@@ -841,13 +850,17 @@ class PolymarketExecutor:
                 signature_type=signature_type,
             )
             result = self.client.get_balance_allowance(params)
-            # USDC.e uses 6 decimals
+            # pUSD uses 6 decimals.
             balance = float(result.get("balance", "0")) / 1e6
-            print(f"[BALANCE] USDC balance: ${balance:.2f}", file=sys.stderr)
+            print(f"[BALANCE] pUSD balance: ${balance:.2f}", file=sys.stderr)
             return balance
         except Exception as e:
-            print(f"[BALANCE ERROR] Failed to get USDC balance: {e}", file=sys.stderr)
+            print(f"[BALANCE ERROR] Failed to get pUSD balance: {e}", file=sys.stderr)
             return 0.0
+
+    def check_usdc_balance(self) -> float:
+        """Backward-compatible alias for legacy callers."""
+        return self.check_collateral_balance()
 
 
 def main():
@@ -858,7 +871,7 @@ def main():
             json.dumps(
                 {
                     "success": False,
-                    "error_message": "Failed to connect: missing credentials",
+                    "error_message": executor.connect_error or "Failed to connect",
                     "orders": [],
                     "total_cost": 0,
                     "total_filled": 0,
@@ -921,9 +934,9 @@ def main():
         print(json.dumps({"success": True, "balances": balances}, indent=2))
         return
 
-    # Check if this is a USDC balance request
-    if isinstance(data, dict) and data.get("action") == "check_usdc_balance":
-        balance = executor.check_usdc_balance()
+    # Check if this is a collateral balance request
+    if isinstance(data, dict) and data.get("action") in {"check_collateral_balance", "check_usdc_balance"}:
+        balance = executor.check_collateral_balance()
         print(json.dumps({"success": True, "balance": balance}, indent=2))
         return
 

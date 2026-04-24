@@ -1,6 +1,6 @@
 """
 领取 Polymarket 已结算仓位的收益。
-通过 Gnosis Safe 代理钱包调用 CTF 合约的 redeemPositions。
+通过 Gnosis Safe 代理钱包调用 CTF 合约的 redeemPositions，赎回到 pUSD。
 """
 import json
 import sys
@@ -17,7 +17,7 @@ EOA_ADDRESS = Account.from_key(PRIVATE_KEY).address if PRIVATE_KEY else ""
 
 # Polygon 合约地址
 CTF_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
-USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+PUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"
 
 # RPC (多备选)
 RPC_URLS = [
@@ -50,7 +50,7 @@ def build_redeem_calldata(condition_id_hex):
     encoded_params = encode(
         ['address', 'bytes32', 'bytes32', 'uint256[]'],
         [
-            Web3.to_checksum_address(USDC_ADDRESS),
+            Web3.to_checksum_address(PUSD_ADDRESS),
             parent_collection_id,
             condition_id, 
             index_sets

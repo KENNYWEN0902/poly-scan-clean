@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Component, useState, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { api } from './api';
 import { StrategyState, AccountInfo } from './types';
 import Portfolio from './pages/Portfolio';
@@ -17,11 +17,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', icon: 'dashboard', label: 'Dashboard', sub: 'Daily summary' },
-  { id: 'strategies', icon: 'insights', label: 'Strategies', sub: 'Active · Backtests' },
-  { id: 'positions', icon: 'account_balance_wallet', label: 'Positions', sub: 'Open & closed' },
-  { id: 'history', icon: 'history', label: 'History', sub: 'Trade log' },
-  { id: 'settings', icon: 'settings', label: 'Settings', sub: 'Configuration' },
+  { id: 'dashboard', icon: 'dashboard', label: '仪表盘', sub: '每日概览' },
+  { id: 'strategies', icon: 'insights', label: '策略', sub: '运行中 · 回测' },
+  { id: 'positions', icon: 'account_balance_wallet', label: '持仓', sub: '开仓与平仓' },
+  { id: 'history', icon: 'history', label: '历史', sub: '交易记录' },
+  { id: 'settings', icon: 'settings', label: '设置', sub: '参数配置' },
 ];
 
 function MIcon({ name, filled, className }: { name: string; filled?: boolean; className?: string }) {
@@ -35,6 +35,49 @@ function MIcon({ name, filled, className }: { name: string; filled?: boolean; cl
   );
 }
 
+class PageErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string; onReset: () => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[dashboard] page render failed', error, info);
+  }
+
+  componentDidUpdate(prevProps: { resetKey: string }) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <div className="bg-surface-container-lowest border border-white/50 rounded-[2rem] neo-shadow p-8 max-w-md text-center">
+            <MIcon name="error" filled className="text-error text-4xl mb-4" />
+            <h2 className="text-xl font-black text-slate-900 mb-2">页面加载失败</h2>
+            <p className="text-sm text-slate-500 mb-6">这个页面的数据格式异常，仪表盘其他页面仍可继续使用。</p>
+            <button
+              onClick={this.props.onReset}
+              className="px-5 py-3 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-container transition-colors"
+            >
+              返回仪表盘
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<PageId>('dashboard');
   const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'reconnecting' | 'failed'>('disconnected');
@@ -43,9 +86,17 @@ export default function App() {
   const [account, setAccount] = useState<AccountInfo | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    const refreshAccount = () => {
+      api.getAccount().then(a => {
+        if (!cancelled && a) setAccount(a);
+      }).catch(() => {});
+    };
+
     api.getStrategy().then(setStrategy).catch(() => {});
     api.getAlerts().then(alerts => setAlertCount(alerts?.length || 0)).catch(() => {});
-    api.getAccount().then(a => { if (a) setAccount(a); }).catch(() => {});
+    refreshAccount();
+    const accountTimer = window.setInterval(refreshAccount, 30_000);
     api.connectWebSocket(
       (type, data) => {
         if (type === 'strategy') setStrategy(data as StrategyState);
@@ -53,12 +104,18 @@ export default function App() {
       },
       (status) => setWsStatus(status),
     );
-    return () => api.disconnectWebSocket();
+    return () => {
+      cancelled = true;
+      window.clearInterval(accountTimer);
+      api.disconnectWebSocket();
+    };
   }, []);
 
   const activeNav = navItems.find(i => i.id === activePage) || navItems[0];
   const totalPnl = strategy?.total_pnl || 0;
-  const portfolioValue = account?.usdc_balance || (account?.portfolio_value || 0);
+  const collateralBalance =
+    account?.collateral_balance ?? account?.pusd_balance ?? account?.usdc_balance ?? 0;
+  const portfolioValue = account?.portfolio_value ?? collateralBalance;
 
   const renderPage = () => {
     switch (activePage) {
@@ -82,7 +139,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-slate-900 leading-tight">PolyBot</h1>
-              <p className="text-[10px] uppercase tracking-widest text-primary font-bold">Automated Trading</p>
+              <p className="text-[10px] tracking-widest text-primary font-bold">自动化交易</p>
             </div>
           </div>
 
@@ -117,7 +174,7 @@ export default function App() {
             {/* Global Equity mini chart */}
             <div className="p-4 bg-surface-container rounded-2xl">
               <div className="flex justify-between items-end mb-2">
-                <span className="text-[10px] text-slate-500 font-bold uppercase">Global Equity</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">总权益</span>
                 <span className={`text-xs font-bold ${totalPnl >= 0 ? 'text-secondary' : 'text-error'}`}>
                   {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
                 </span>
@@ -155,7 +212,7 @@ export default function App() {
                 <div className="flex items-center gap-1">
                   <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === 'connected' ? 'bg-secondary animate-pulse' : 'bg-error'}`} />
                   <span className="text-[10px] text-slate-500 uppercase font-medium">
-                    {wsStatus === 'connected' ? 'Online - Synced' : 'Offline'}
+                    {wsStatus === 'connected' ? '在线 · 已同步' : '离线'}
                   </span>
                 </div>
               </div>
@@ -173,7 +230,7 @@ export default function App() {
         <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 backdrop-blur-xl z-40 border-b border-slate-100">
           <div className="flex justify-between items-center px-8 h-full">
             <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-              <span>Pages</span>
+              <span>页面</span>
               <span className="text-slate-300">/</span>
               <span>{activeNav.label}</span>
               <span className="text-slate-300">/</span>
@@ -184,7 +241,7 @@ export default function App() {
                 <MIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
                 <input
                   type="text"
-                  placeholder="Search markets..."
+                  placeholder="搜索市场..."
                   className="bg-surface-container-low border-none rounded-xl pl-10 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
@@ -210,19 +267,21 @@ export default function App() {
 
         {/* Page content */}
         <div className="mt-16 p-8 pb-12 animate-fade-in">
-          {renderPage()}
+          <PageErrorBoundary resetKey={activePage} onReset={() => setActivePage('dashboard')}>
+            {renderPage()}
+          </PageErrorBoundary>
         </div>
 
         {/* Status bar */}
         <footer className="fixed bottom-0 right-0 w-[calc(100%-16rem)] h-8 bg-primary/95 text-white flex items-center justify-between px-8 text-[10px] font-bold tracking-widest uppercase z-50">
           <div className="flex items-center gap-2">
             <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === 'connected' ? 'bg-secondary-fixed' : 'bg-error'}`} />
-            System Status: {wsStatus === 'connected' ? 'SYNCED & OPERATIONAL' : 'DISCONNECTED'}
+            系统状态：{wsStatus === 'connected' ? '已同步并正常运行' : '已断开'}
           </div>
           <div className="flex items-center gap-4">
-            <span>Trades: {strategy?.total_trades || 0}</span>
+            <span>交易数：{strategy?.total_trades || 0}</span>
             <span className="text-primary-fixed">
-              Win Rate: {(strategy?.win_rate || 0).toFixed(1)}%
+              胜率：{(strategy?.win_rate || 0).toFixed(1)}%
             </span>
           </div>
         </footer>

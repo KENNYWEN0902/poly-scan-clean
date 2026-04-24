@@ -8,7 +8,7 @@
 
 Poly-Bot is a high-performance Polymarket BTC 5-minute delay arbitrage scanner with a monitoring dashboard. **Go + Python hybrid architecture**:
 - **Go**: WebSocket listener, BTC spot price monitoring, strategy execution, REST API server
-- **Python**: Order signing and execution via `py-clob-client` SDK
+- **Python**: Order signing and execution via `py-clob-client-v2` SDK
 - **React Dashboard**: Real-time monitoring UI (Vite + Tailwind + Recharts)
 
 ## Structure
@@ -39,7 +39,7 @@ poly-scan/
 │       ├── types.ts         # TypeScript interfaces (mirror Go structs)
 │       └── pages/           # Dashboard, Markets, Trades, Risk, Settings
 ├── scripts/
-│   └── executor.py          # Python order executor (py-clob-client)
+│   └── executor.py          # Python order executor (py-clob-client-v2)
 ├── ecosystem.config.js      # PM2 configuration
 └── start.sh                 # Startup script with env vars
 ```

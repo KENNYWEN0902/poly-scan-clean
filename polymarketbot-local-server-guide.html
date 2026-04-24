@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>polymarketbot 本地配置与服务器运行教程</title>
+  <style>
+    :root {
+      --bg: #f7f3ea;
+      --card: #fffdf8;
+      --text: #1e1a16;
+      --muted: #6f675f;
+      --line: #ddd3c6;
+      --accent: #0f5b48;
+      --accent-soft: #e3f2ec;
+      --warn: #8d3a17;
+      --warn-soft: #fff2e9;
+      --code: #1c2430;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #f8f3ea 0%, #efe6d8 100%);
+      line-height: 1.7;
+    }
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+    .hero, .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 10px 28px rgba(62, 46, 25, 0.07);
+    }
+    .hero {
+      padding: 28px;
+      background: linear-gradient(135deg, #133c32, #0f5b48 60%, #33836b);
+      color: #fff;
+      border: none;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.2;
+    }
+    .hero p {
+      margin: 8px 0;
+      color: rgba(255,255,255,0.92);
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.2);
+      font-size: 14px;
+    }
+    .card {
+      margin-top: 18px;
+      padding: 22px;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+    h3 {
+      margin-top: 24px;
+      font-size: 18px;
+    }
+    p, li { font-size: 16px; }
+    ul, ol { padding-left: 22px; }
+    code {
+      background: #f1ece4;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    pre {
+      background: var(--code);
+      color: #eef5ff;
+      border-radius: 16px;
+      padding: 16px;
+      overflow-x: auto;
+      border: 1px solid #0d1117;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+    .note, .warn {
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+    .note {
+      background: var(--accent-soft);
+      border: 1px solid #b9dbcf;
+    }
+    .warn {
+      background: var(--warn-soft);
+      border: 1px solid #f1c4ad;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>polymarketbot 本地配置与服务器运行教程</h1>
+      <p>这份教程专门为你现在的流程写的：先在本地整理配置，再上传到 Ubuntu 22.04 服务器运行。</p>
+      <div class="meta">
+        <span class="pill">更新时间：2026-04-24</span>
+        <span class="pill">本地目录：/Users/kennywen/Documents/Playground/polymarketbot</span>
+        <span class="pill">目标系统：Ubuntu 22.04 LTS</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2026-04-24 已同步修复</h2>
+      <div class="note">
+        正式项目目录已经统一为 <code>/Users/kennywen/Documents/Playground/polymarketbot</code>。此前临时 Codex 目录中的 RTDS、pUSD 余额、历史页、API 超时缓存和 WebSocket 状态修复，已经同步回正式项目。
+      </div>
+      <ul>
+        <li>ChainlinkMonitor 可连接 Polymarket RTDS，并显示 <code>RTDS BTC/USD price established</code>。</li>
+        <li><code>/api/account</code> 可读取 CLOB collateral/pUSD 余额，并使用短超时与缓存避免页面卡死。</li>
+        <li>Dashboard 历史页没有交易时正常显示空状态。</li>
+        <li>Dashboard 所有页面可打开，左下角余额和 WebSocket 在线状态正常。</li>
+      </ul>
+      <pre><code>cd /root/poly-scan
+gofmt -w cmd/api/main.go internal/btc/chainlink_monitor.go internal/btc/predictor.go internal/polymarket/api.go
+go build -o poly-bot-api ./cmd/api
+go build -o poly-bot ./cmd/main.go
+
+cd /root/poly-scan/dashboard
+npm install
+npm run build
+
+cd /root/poly-scan
+pm2 restart poly-bot-api --update-env
+pm2 restart poly-bot-btc --update-env
+pm2 restart poly-dashboard --update-env</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>一、最推荐的做法</h2>
+      <ol>
+        <li>本地只修改非敏感配置。</li>
+        <li>本地不要保存真实私钥。</li>
+        <li>上传到服务器后，再创建真正的 <code>.env</code>。</li>
+        <li>编译和运行都放在 Ubuntu 服务器完成。</li>
+      </ol>
+      <div class="warn">
+        私钥、API Secret、Passphrase 这类敏感值，不建议提前写进本地项目目录，尤其是 <code>Documents</code> 目录可能会被同步或备份。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>二、这个 bot 最关键的 3 个参数</h2>
+      <pre><code>POLY_PRIVATE_KEY=0x你的浏览器钱包私钥
+POLY_SIGNATURE_TYPE=2
+POLY_FUNDER_ADDRESS=0x你在Polymarket个人资料页看到的地址</code></pre>
+      <p>其中：</p>
+      <ul>
+        <li><code>POLY_PRIVATE_KEY</code>：建议只在服务器上填写。</li>
+        <li><code>POLY_SIGNATURE_TYPE=2</code>：适合你现在这条浏览器钱包路线。</li>
+        <li><code>POLY_FUNDER_ADDRESS</code>：用 Polymarket 个人资料页地址，不是充值弹窗地址。</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>三、本地应该改什么</h2>
+      <p>我给你准备了一份安全模板文件：<code>env.server.template</code>。</p>
+      <p>你可以在本地先填写这些非敏感内容：</p>
+      <ul>
+        <li><code>POLY_SIGNATURE_TYPE=2</code></li>
+        <li><code>POLY_FUNDER_ADDRESS=你的个人资料页地址</code></li>
+        <li><code>POLY_TRADE_AMOUNT=5</code></li>
+        <li><code>API_PORT=9876</code></li>
+      </ul>
+      <p>但先不要在本地填写真实 <code>POLY_PRIVATE_KEY</code>。</p>
+      <pre><code>cd /Users/kennywen/Documents/Playground/polymarketbot
+cat env.server.template
+nano env.server.template</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>四、上传到服务器</h2>
+      <h3>方式 A：命令行上传</h3>
+      <pre><code>scp -r /Users/kennywen/Documents/Playground/polymarketbot root@1.2.3.4:/root/poly-scan</code></pre>
+      <p>如果你用的是 <code>ubuntu</code> 用户：</p>
+      <pre><code>scp -r /Users/kennywen/Documents/Playground/polymarketbot ubuntu@1.2.3.4:/home/ubuntu/poly-scan
+ssh ubuntu@1.2.3.4
+sudo -i
+mv /home/ubuntu/poly-scan /root/poly-scan</code></pre>
+      <h3>方式 B：图形工具上传</h3>
+      <p>你也可以用 FileZilla、Cyberduck、FinalShell。服务器目标路径建议固定为 <code>/root/poly-scan</code>，这样就不用改 PM2 配置里的路径。</p>
+    </section>
+
+    <section class="card">
+      <h2>五、服务器上如何配置</h2>
+      <pre><code>ssh root@你的服务器IP
+cd /root/poly-scan
+cp env.server.template .env
+nano .env</code></pre>
+      <p>把模板中的私钥占位符改成真实私钥，然后确认下面两项正确：</p>
+      <pre><code>POLY_SIGNATURE_TYPE=2
+POLY_FUNDER_ADDRESS=0x你个人资料页中的地址</code></pre>
+      <p>一个适合你现在的小额测试版本：</p>
+      <pre><code>POLY_PRIVATE_KEY=0x你的真实钱包私钥
+POLY_SIGNATURE_TYPE=2
+POLY_FUNDER_ADDRESS=0x你个人资料页中的地址
+POLY_TAKE_PROFIT_PCT=0.50
+POLY_STOP_LOSS_PCT=0.30
+POLY_TRADE_AMOUNT=5
+API_PORT=9876</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>六、服务器安装依赖</h2>
+      <pre><code>apt update
+apt upgrade -y
+apt install -y git curl ca-certificates gnupg lsb-release build-essential python3 python3-pip python3-venv nginx golang-go
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+npm install -g pm2 serve
+cd /root/poly-scan
+python3 -m pip install --upgrade pip
+python3 -m pip install py-clob-client requests web3 eth-account eth-abi</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>七、服务器编译</h2>
+      <pre><code>cd /root/poly-scan
+go mod tidy
+go build -o poly-bot ./cmd/main.go
+go build -o poly-bot-api ./cmd/api/main.go
+cd /root/poly-scan/dashboard
+npm install
+npm run build
+cd /root/poly-scan
+mkdir -p /root/poly-scan/logs
+mkdir -p /root/poly-scan/data</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>八、先做安全测试</h2>
+      <h3>测试 API</h3>
+      <pre><code>cd /root/poly-scan
+./poly-bot-api</code></pre>
+      <p>另开一个窗口：</p>
+      <pre><code>curl http://127.0.0.1:9876/api/strategy</code></pre>
+
+      <h3>测试 bot</h3>
+      <pre><code>cd /root/poly-scan
+./poly-bot</code></pre>
+      <p>程序能启动且不立刻崩溃，就说明主流程基础上是通的。</p>
+    </section>
+
+    <section class="card">
+      <h2>九、正式运行</h2>
+      <h3>直接运行</h3>
+      <pre><code>cd /root/poly-scan
+./poly-bot</code></pre>
+
+      <h3>PM2 托管</h3>
+      <pre><code>cd /root/poly-scan
+pm2 start ecosystem.config.js --only poly-bot-api
+pm2 start ecosystem.config.js --only poly-dashboard
+pm2 start ecosystem.config.js --only poly-bot-btc
+pm2 status
+pm2 logs poly-bot-btc --lines 50
+pm2 save
+pm2 startup systemd</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>十、如果你想从浏览器访问 dashboard</h2>
+      <pre><code>nano /etc/nginx/sites-available/poly-bot</code></pre>
+      <pre><code>server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:3457;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:9876;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws {
+        proxy_pass http://127.0.0.1:9876/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</code></pre>
+      <pre><code>ln -sf /etc/nginx/sites-available/poly-bot /etc/nginx/sites-enabled/poly-bot
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl restart nginx</code></pre>
+      <p>然后浏览器访问：<code>http://你的服务器IP</code></p>
+    </section>
+
+    <section class="card">
+      <h2>最后一句最重要</h2>
+      <div class="note">
+        <strong>POLY_FUNDER_ADDRESS</strong> 用个人资料页地址；<strong>充值</strong> 用充值弹窗地址；<strong>私钥</strong> 只在服务器上填写。
+      </div>
+    </section>
+  </div>
+</body>
+</html>

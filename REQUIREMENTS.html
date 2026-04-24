@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PolymarketBot 需求文档</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.75; color: #172033; background: #f4f7fb; }
+    main { max-width: 980px; margin: 0 auto; padding: 36px 18px 64px; }
+    section { background: #fff; border: 1px solid #dbe3ef; border-radius: 22px; padding: 26px; margin: 16px 0; box-shadow: 0 18px 45px rgba(23, 32, 51, 0.06); }
+    h1 { font-size: 34px; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin-top: 0; }
+    code { background: #edf2f7; border-radius: 6px; padding: 2px 6px; }
+    pre { background: #111827; color: #e5e7eb; border-radius: 14px; padding: 14px; overflow-x: auto; }
+    li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>PolymarketBot 需求文档</h1>
+    <p>更新时间：2026-04-24</p>
+    <p>正式本地项目目录：<code>/Users/kennywen/Documents/Playground/polymarketbot</code></p>
+  </section>
+  <section>
+    <h2>运行目标</h2>
+    <ul>
+      <li>连接 Polymarket RTDS 获取 BTC/USD Chainlink 价格。</li>
+      <li>使用 pUSD/CLOB collateral 作为 Dashboard 可用余额来源。</li>
+      <li>Dashboard 稳定展示账户、策略、持仓、历史、设置和 WebSocket 在线状态。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>功能需求</h2>
+    <ul>
+      <li>RTDS 使用当前订阅协议并保持 PING 保活，断线自动重连。</li>
+      <li><code>/api/account</code> 优先查询 CLOB collateral/pUSD，并带短超时和缓存。</li>
+      <li><code>/api/trades</code> 没有交易时返回 <code>[]</code>。</li>
+      <li>Dashboard 任意单个 API 慢或失败时，页面主体仍应显示。</li>
+      <li>Dashboard WebSocket 由全局 App 管理，页面组件只订阅事件。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>验收标准</h2>
+    <ul>
+      <li>PM2 中 <code>poly-bot-api</code>、<code>poly-bot-btc</code>、<code>poly-dashboard</code> 均为 online。</li>
+      <li>日志出现 <code>RTDS BTC/USD price established</code>。</li>
+      <li>Dashboard 左下角显示正确余额和“在线 · 已同步”。</li>
+      <li>历史页无交易时显示“暂无交易记录”。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

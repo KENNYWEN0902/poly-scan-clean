@@ -2,6 +2,8 @@ package btc
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,12 +27,17 @@ type PredictorConfig struct {
 // - Exploits ~55 second lag between Chainlink updates and Polymarket repricing
 func DefaultPredictorConfig() PredictorConfig {
 	return PredictorConfig{
-		WindowSeconds:     45,   // Predict 45 seconds before window end (match strategy PredictBeforeEnd)
-		MinConfidence:     0.52, // 52% confidence threshold (EV+ with GTC maker orders)
-		MinPriceChangePct: 0.01, // 0.01% minimum change (~$7 for BTC at $70K; confidence threshold filters noise)
-		MaxTokenPrice:     0.48, // Live test: accept tokens <$0.48 for trade frequency
-		TrendLookbackSecs: 15,   // Look back 15 seconds for trend
+		WindowSeconds:     55,   // 更接近代码里固定的 ~55s lag 假设
+		MinConfidence:     0.60, // 只做更高把握的单
+		MinPriceChangePct: 0.07, // 回到研究口径附近，过滤小噪音
+		MaxTokenPrice:     0.30, // 只买更便宜的票
+		TrendLookbackSecs: 15,
 	}
+}
+
+func requireChainlinkRTDS() bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("POLY_REQUIRE_CHAINLINK_RTDS")))
+	return value == "1" || value == "true" || value == "yes"
 }
 
 // MarketPredictor predicts the outcome of a BTC Up/Down market
@@ -109,6 +116,14 @@ func (p *MarketPredictor) PredictAtWindowEnd(windowStart time.Time, windowDurati
 
 	// Get current Chainlink price (from actual Chainlink Data Streams via RTDS)
 	currentChainlinkPrice := chainlinkHistory[len(chainlinkHistory)-1].Price
+	latestSource := chainlinkHistory[len(chainlinkHistory)-1].Source
+	if latestSource != "chainlink_rtds" && requireChainlinkRTDS() {
+		fmt.Printf("[PREDICTOR] Skipping: latest source is %s, not chainlink_rtds\n", latestSource)
+		return nil
+	}
+	if latestSource != "chainlink_rtds" {
+		fmt.Printf("[PREDICTOR] Warning: latest source is %s; using degraded fallback price mode\n", latestSource)
+	}
 
 	// Calculate Chainlink window change (determines settlement!)
 	var chainlinkWindowChangePct float64
@@ -392,26 +407,6 @@ func (p *MarketPredictor) ShouldTrade(direction string, upTokenPrice, downTokenP
 		return false, direction, fmt.Sprintf("%s token price too low ($%.4f) - market may be settled", tokenName, tokenPrice)
 	}
 
-	// Predicted side is too expensive → consider buying the CHEAP opposite side
-	// This is a contrarian play: market overestimates the predicted direction
-	var oppositePrice float64
-	var oppositeName, oppositeDir string
-	if direction == "up" {
-		oppositePrice = downTokenPrice
-		oppositeName = "DOWN"
-		oppositeDir = "down"
-	} else {
-		oppositePrice = upTokenPrice
-		oppositeName = "UP"
-		oppositeDir = "up"
-	}
-
-	// Only buy the cheap side if it has good risk/reward (price ≤ MaxTokenPrice)
-	if oppositePrice <= p.config.MaxTokenPrice && oppositePrice >= 0.02 {
-		return true, oppositeDir, fmt.Sprintf("Contrarian: %s too expensive ($%.4f), buying %s at $%.4f instead",
-			tokenName, tokenPrice, oppositeName, oppositePrice)
-	}
-
-	return false, direction, fmt.Sprintf("Both sides overpriced: %s=$%.4f, %s=$%.4f (Max: $%.2f)",
-		tokenName, tokenPrice, oppositeName, oppositePrice, p.config.MaxTokenPrice)
+	// 复测版：如果预测方向太贵，直接不做；不再反手买对侧
+	return false, direction, fmt.Sprintf("%s too expensive at $%.4f (Max: $%.2f)", tokenName, tokenPrice, p.config.MaxTokenPrice)
 }
